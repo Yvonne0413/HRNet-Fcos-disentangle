@@ -5,7 +5,7 @@ import os
 
 
 class DatasetCatalog(object):
-    DATA_DIR = "datasets"
+    DATA_DIR = "../../dataset"
     DATASETS = {
         "coco_2017_train": {
             "img_dir": "coco2017/train2017",
@@ -25,7 +25,7 @@ class DatasetCatalog(object):
         },
         "coco_2014_minival": {
             "img_dir": "coco2014/val2014",
-            "ann_file": "coco2014/annotations/instances_minival2014.json"
+            "ann_file": "cocomaskrcnn/annotations/instances_minival2014.json"
         },
         "coco_2014_valminusminival": {
             "img_dir": "coco2014/val2014",
