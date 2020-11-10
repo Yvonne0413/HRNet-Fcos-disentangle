@@ -8,44 +8,44 @@ class DatasetCatalog(object):
     DATA_DIR = "datasets"
     DATASETS = {
         "coco_2017_train": {
-            "img_dir": "coco/train2017",
-            "ann_file": "coco/annotations/instances_train2017.json"
+            "img_dir": "coco2017/train2017",
+            "ann_file": "coco2017/annotations/instances_train2017.json"
         },
         "coco_2017_val": {
-            "img_dir": "coco/val2017",
-            "ann_file": "coco/annotations/instances_val2017.json"
+            "img_dir": "coco2017/val2017",
+            "ann_file": "coco2017/annotations/instances_val2017.json"
         },
         "coco_2014_train": {
-            "img_dir": "coco/train2014",
-            "ann_file": "coco/annotations/instances_train2014.json"
+            "img_dir": "coco2014/train2014",
+            "ann_file": "coco2014/annotations/instances_train2014.json"
         },
         "coco_2014_val": {
-            "img_dir": "coco/val2014",
-            "ann_file": "coco/annotations/instances_val2014.json"
+            "img_dir": "coco2014/val2014",
+            "ann_file": "coco2014/annotations/instances_val2014.json"
         },
         "coco_2014_minival": {
-            "img_dir": "coco/val2014",
-            "ann_file": "coco/annotations/instances_minival2014.json"
+            "img_dir": "coco2014/val2014",
+            "ann_file": "coco2014/annotations/instances_minival2014.json"
         },
         "coco_2014_valminusminival": {
-            "img_dir": "coco/val2014",
-            "ann_file": "coco/annotations/instances_valminusminival2014.json"
+            "img_dir": "coco2014/val2014",
+            "ann_file": "cocomaskrcnn/annotations/instances_valminusminival2014.json"
         },
         "keypoints_coco_2014_train": {
-            "img_dir": "coco/train2014",
-            "ann_file": "coco/annotations/person_keypoints_train2014.json",
+            "img_dir": "coco2014/train2014",
+            "ann_file": "coco2014/annotations/person_keypoints_train2014.json",
         },
         "keypoints_coco_2014_val": {
-            "img_dir": "coco/val2014",
-            "ann_file": "coco/annotations/person_keypoints_val2014.json"
+            "img_dir": "coco2014/val2014",
+            "ann_file": "coco2014/annotations/person_keypoints_val2014.json"
         },
         "keypoints_coco_2014_minival": {
-            "img_dir": "coco/val2014",
-            "ann_file": "coco/annotations/person_keypoints_minival2014.json",
+            "img_dir": "coco2014/val2014",
+            "ann_file": "cocomaskrcnn/annotations/person_keypoints_minival2014.json",
         },
         "keypoints_coco_2014_valminusminival": {
-            "img_dir": "coco/val2014",
-            "ann_file": "coco/annotations/person_keypoints_valminusminival2014.json",
+            "img_dir": "coco2014/val2014",
+            "ann_file": "cocomaskrcnn/annotations/person_keypoints_valminusminival2014.json",
         },
         "voc_2007_train": {
             "data_dir": "voc/VOC2007",
