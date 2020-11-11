@@ -21,7 +21,6 @@ class FCOSHead(torch.nn.Module):
         num_level = len(cfg.MODEL.FCOS.FPN_STRIDES)
 
         cls_tower = []
-        # bbox_tower = []
         for i in range(cfg.MODEL.FCOS.NUM_CONVS):
             cls_tower.append(
                 nn.Conv2d(
@@ -34,42 +33,25 @@ class FCOSHead(torch.nn.Module):
             )
             cls_tower.append(nn.GroupNorm(32, in_channels))
             cls_tower.append(nn.ReLU())
-            """
-            bbox_tower.append(
-                nn.Conv2d(
-                    in_channels,
-                    in_channels,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1
-                )
-            )
-            bbox_tower.append(nn.GroupNorm(32, in_channels))
-            bbox_tower.append(nn.ReLU())
-            """
-        # end for 4 tower cov layers
-
-        bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
-        
-
-
         self.add_module('cls_tower', nn.Sequential(*cls_tower))
-        self.add_module('bbox_tower', nn.Sequential(*bbox_tower))
-        # not sure if need to delete the add_module bbox_tower
+        
+        self.bbox_channels_prebranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
+        """
+                self.transition_layer = nn.Sequential(
+            nn.Conv2d(in_channels, self.bbox_channels_prebranch*4,
+                        1, 1, 0, bias=False),
+            nn.BatchNorm2d(regression_channels),
+            #GroupBN: GroupBN always used in Det
+            nn.ReLU(True))
+        """
+
+        self.bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
+        self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
 
         self.cls_logits = nn.Conv2d(
             in_channels, num_classes, kernel_size=3, stride=1,
             padding=1
         )
-
-        """
-        self.bbox_pred = nn.Conv2d(
-            in_channels, 4, kernel_size=3, stride=1,
-            padding=1
-        )
-        """
-        self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
-        
         self.centerness = nn.Conv2d(
             in_channels, 1, kernel_size=3, stride=1,
             padding=1
@@ -102,14 +84,34 @@ class FCOSHead(torch.nn.Module):
 
             # NOTE: Apply centerness branch on box tower lead to 0.5% improvement.
             #       Just uncomment the line 91-93 and comment line 94-97.
-            bbox_tower = self.bbox_tower(feature)
-            bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
-            centerness.append(self.centerness(bbox_tower))
+            # bbox_tower = self.bbox_tower(feature)
+            # bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
+            # centerness.append(self.centerness(bbox_tower))
+            centerness.append(self.centerness(cls_tower))            
 
-            # centerness.append(self.centerness(cls_tower))
-            # bbox_reg.append(torch.exp(self.scales[l](
-            #     self.bbox_pred(self.bbox_tower(feature))
-            # )))
+            # ???The meaning for 4 channels. 
+            # l, r, t, b
+            # ???Disentangle should consider the physical meaning.
+            # bbox_feature = self.transition_layer(feature)
+
+            bbox = []
+            for i in range(4):
+                bbox.append(self.bbox_pred[i](\
+                    self.bbox_tower[i](\
+                        feature[:,i*self.bbox_channels_prebranch:\
+                            (i+1)*self.bbox_channels_prebranch])))
+
+            left = bbox[0]
+            right = bbox[1]
+            top = bbox[2]
+            bottom = bbox[3]
+
+            bbox[0], bbox[1], bbox[2], bbox[3] = \
+            (left+right)/2, (top+bottom)/2, bottom-top, right-left
+
+            bbox = torch.cat(bbox, dim=1)
+            bbox_reg.append(torch.exp(self.scales[l](bbox)))
+            
         return logits, bbox_reg, centerness
 
 
@@ -138,7 +140,7 @@ class FCOSModule(torch.nn.Module):
             features (list[Tensor]): features computed from the images that are
                 used for computing the predictions. Each tensor in the list
                 correspond to different feature levels
-            targets (list[BoxList): ground-truth boxes present in the image (optional if for inference)
+            targets (list[BoxList): ground-truth boxes present in the image (optional)
 
         Returns:
             boxes (list[BoxList]): the predicted boxes from the RPN, one BoxList per

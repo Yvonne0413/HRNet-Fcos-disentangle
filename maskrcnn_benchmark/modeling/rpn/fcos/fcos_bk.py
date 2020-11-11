@@ -7,7 +7,7 @@ from .inference import make_fcos_postprocessor
 from .loss import make_fcos_loss_evaluator
 
 from maskrcnn_benchmark.layers import Scale
-from .bbox_module import make_bbox_tower, make_layer, make_final_layers
+
 
 class FCOSHead(torch.nn.Module):
     def __init__(self, cfg, in_channels):
@@ -21,7 +21,7 @@ class FCOSHead(torch.nn.Module):
         num_level = len(cfg.MODEL.FCOS.FPN_STRIDES)
 
         cls_tower = []
-        # bbox_tower = []
+        bbox_tower = []
         for i in range(cfg.MODEL.FCOS.NUM_CONVS):
             cls_tower.append(
                 nn.Conv2d(
@@ -34,7 +34,6 @@ class FCOSHead(torch.nn.Module):
             )
             cls_tower.append(nn.GroupNorm(32, in_channels))
             cls_tower.append(nn.ReLU())
-            """
             bbox_tower.append(
                 nn.Conv2d(
                     in_channels,
@@ -46,30 +45,17 @@ class FCOSHead(torch.nn.Module):
             )
             bbox_tower.append(nn.GroupNorm(32, in_channels))
             bbox_tower.append(nn.ReLU())
-            """
-        # end for 4 tower cov layers
-
-        bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
-        
-
 
         self.add_module('cls_tower', nn.Sequential(*cls_tower))
         self.add_module('bbox_tower', nn.Sequential(*bbox_tower))
-        # not sure if need to delete the add_module bbox_tower
-
         self.cls_logits = nn.Conv2d(
             in_channels, num_classes, kernel_size=3, stride=1,
             padding=1
         )
-
-        """
         self.bbox_pred = nn.Conv2d(
             in_channels, 4, kernel_size=3, stride=1,
             padding=1
         )
-        """
-        self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
-        
         self.centerness = nn.Conv2d(
             in_channels, 1, kernel_size=3, stride=1,
             padding=1
@@ -82,8 +68,7 @@ class FCOSHead(torch.nn.Module):
             for l in modules.modules():
                 if isinstance(l, nn.Conv2d):
                     torch.nn.init.normal_(l.weight, std=0.01)
-                    if l.bias is not None:
-                        torch.nn.init.constant_(l.bias, 0)
+                    torch.nn.init.constant_(l.bias, 0)
 
         # initialize the bias for focal loss
         prior_prob = cfg.MODEL.FCOS.PRIOR_PROB
