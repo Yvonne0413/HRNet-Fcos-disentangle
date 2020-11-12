@@ -28,7 +28,7 @@ class FcosBlock(nn.Module):
                     stride=1,
                     padding=1
                 )
-        self.gn1_bboxtower_fcos = nn.GroupNorm(32, planes)
+        self.gn1_bboxtower_fcos = nn.GroupNorm(8, planes)
         self.relu1_bboxtower_fcos = nn.ReLU()
         self.conv2_bboxtower_fcos = nn.Conv2d(
                     planes,
@@ -37,7 +37,7 @@ class FcosBlock(nn.Module):
                     stride=1,
                     padding=1
                 )
-        self.gn2_bboxtower_fcos = nn.GroupNorm(32, planes)
+        self.gn2_bboxtower_fcos = nn.GroupNorm(8, planes)
         self.relu2_bboxtower_fcos = nn.ReLU()
 
 
@@ -142,30 +142,30 @@ class BasicBlock(nn.Module):
     def __init__(self, inplanes, planes, stride=1, 
             downsample=None, dilation=1):
         super(BasicBlock, self).__init__()
-        self.conv1_head = conv3x3(inplanes, planes, stride, dilation=dilation)
-        self.bn1_head = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.relu_head = nn.ReLU(inplace=True)
-        self.conv2_head = conv3x3(planes, planes, dilation=dilation)
-        self.bn2_head = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.downsample_head = downsample
-        self.stride_head = stride
+        self.conv1_bboxtower_basic = conv3x3(inplanes, planes, stride, dilation=dilation)
+        self.bn1_bboxtower_basic = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.relu_bboxtower_basic = nn.ReLU(inplace=True)
+        self.conv2_bboxtower_basic = conv3x3(planes, planes, dilation=dilation)
+        self.bn2_bboxtower_basic = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.downsample_bboxtower_basic = downsample
+        self.stride_bboxtower_basic = stride
 
 
     def forward(self, x):
         residual = x
 
-        out = self.conv1_head(x)
-        out = self.bn1_head(out)
-        out = self.relu_head(out)
+        out = self.conv1_bboxtower_basic(x)
+        out = self.bn1_bboxtower_basic(out)
+        out = self.relu_bboxtower_basic(out)
 
-        out = self.conv2_head(out)
-        out = self.bn2_head(out)
+        out = self.conv2_bboxtower_basic(out)
+        out = self.bn2_bboxtower_basic(out)
 
-        if self.downsample_head is not None:
-            residual = self.downsample_head(x)
+        if self.downsample_bboxtower_basic is not None:
+            residual = self.downsample_bboxtower_basic(x)
 
         out += residual
-        out = self.relu_head(out)
+        out = self.relu_bboxtower_basic(out)
 
         return out
 
@@ -182,7 +182,7 @@ class DeformableBlock(nn.Module):
         self.conv_offset_1 = nn.Conv2d(inplanes, 18, 3, 1, 1, bias=True)
         self.conv_offset_2 = nn.Conv2d(inplanes, 18, 3, 1, 1, bias=True)
 
-        self.conv1 = DeformConv(
+        self.conv1_bboxtower = DeformConv(
             inplanes,
             outplanes,
             kernel_size=3,
@@ -190,7 +190,7 @@ class DeformableBlock(nn.Module):
             padding=dilation,
             dilation=dilation,
             deformable_groups=deformable_groups)
-        self.bn1 = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
+        self.gn1_bboxtower = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
 
         self.conv2 = DeformConv(
             outplanes,

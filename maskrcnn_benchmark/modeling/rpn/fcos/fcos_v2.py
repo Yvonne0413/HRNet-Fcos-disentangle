@@ -34,14 +34,10 @@ class FCOSHead(torch.nn.Module):
             cls_tower.append(nn.GroupNorm(32, in_channels))
             cls_tower.append(nn.ReLU())
         self.add_module('cls_tower', nn.Sequential(*cls_tower))
-
         
         self.bbox_channels_perbranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
-        bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
-        self.add_module('bbox_tower', nn.Sequential(*bbox_tower))
-
+        self.bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
         self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
-
         # not sure if need to delete the add_module bbox_tower
 
         self.cls_logits = nn.Conv2d(

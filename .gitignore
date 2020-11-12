@@ -28,3 +28,12 @@ dist/
 # project dirs
 /datasets
 /models
+philly_training/
+local_training/
+loacal_training/
+aml_training/
+
+# maskrcnn_benchmark/
+
+maskrcnn_benchmark/modeling/rpn/fcos/dcn/.eggs/
+maskrcnn_benchmark/modeling/rpn/fcos/dcn/lib.egg-info/
