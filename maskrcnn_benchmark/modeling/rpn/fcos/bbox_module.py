@@ -104,7 +104,7 @@ class FcosSkipBlock(nn.Module):
                     stride=1,
                     padding=1
                 )
-        self.gn1_bboxtower_fcosskip = nn.GroupNorm(32, planes)
+        self.gn1_bboxtower_fcosskip = nn.GroupNorm(8, planes)
         self.relu1_bboxtower_fcosskip = nn.ReLU()
         self.conv2_bboxtower_fcosskip = nn.Conv2d(
                     planes,
@@ -113,7 +113,7 @@ class FcosSkipBlock(nn.Module):
                     stride=1,
                     padding=1
                 )
-        self.gn2_bboxtower_fcosskip = nn.GroupNorm(32, planes)
+        self.gn2_bboxtower_fcosskip = nn.GroupNorm(8, planes)
         self.relu2_bboxtower_fcosskip = nn.ReLU()
 
 
@@ -182,7 +182,7 @@ class DeformableBlock(nn.Module):
         self.conv_offset_1 = nn.Conv2d(inplanes, 18, 3, 1, 1, bias=True)
         self.conv_offset_2 = nn.Conv2d(inplanes, 18, 3, 1, 1, bias=True)
 
-        self.conv1_bboxtower = DeformConv(
+        self.conv1_bboxtower_def = DeformConv(
             inplanes,
             outplanes,
             kernel_size=3,
@@ -190,9 +190,10 @@ class DeformableBlock(nn.Module):
             padding=dilation,
             dilation=dilation,
             deformable_groups=deformable_groups)
-        self.gn1_bboxtower = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
+        self.gn1_bboxtower_def = nn.GroupNorm(8, outplanes)
+        self.relu1_bboxtower_def = nn.ReLU()
 
-        self.conv2 = DeformConv(
+        self.conv2_bboxtower_def = DeformConv(
             outplanes,
             outplanes,
             kernel_size=3,
@@ -200,26 +201,22 @@ class DeformableBlock(nn.Module):
             padding=dilation,
             dilation=dilation,
             deformable_groups=deformable_groups)
-        self.bn2 = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
-        self.relu = nn.ReLU(inplace=True)
+        self.gn2_bboxtower_def = nn.GroupNorm(8, outplanes)
+        self.relu2_bboxtower_def = nn.ReLU()
+
         self.downsample = downsample
 
     def forward(self, x):
-        residual = x
+
         offset = self.conv_offset_1(x)
-        out = self.conv1(x, offset)
-        out = self.bn1(out)
-        out = self.relu(out)
+        out = self.conv1_bboxtower_def(x, offset)
+        out = self.gn1_bboxtower_def(out)
+        out = self.relu1_bboxtower_def(out)
 
         offset_2 = self.conv_offset_2(out)
-        out = self.conv2(out, offset_2)
-        out = self.bn2(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
+        out = self.conv2_bboxtower_def(out, offset_2)
+        out = self.gn2_bboxtower_def(out)
+        out = self.relu2_bboxtower_def(out)
 
         return out
 
