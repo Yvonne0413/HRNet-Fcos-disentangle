@@ -1,5 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
+import numpy as np
 
 from .dcn import DeformConv, ModulatedDeformConv
 
@@ -310,8 +312,8 @@ class STNBLOCK(nn.Module):
                                                 [-1, 0, 1, -1 ,0 ,1 ,-1, 0, 1]]))
         self.register_buffer('regular_matrix', regular_matrix.float())
         self.downsample = downsample
-        self.transform_matrix_conv1 = nn.Conv2d(inplanes, 4, 3, 1, 1, bias=True)
-        self.stn_conv1 = DeformConv(
+        self.conv1_transform_matrix = nn.Conv2d(inplanes, 4, 3, 1, 1, bias=True)
+        self.conv1_bboxtower_stn = DeformConv(
             inplanes,
             outplanes,
             kernel_size=3,
@@ -319,10 +321,11 @@ class STNBLOCK(nn.Module):
             padding=dilation,
             dilation=dilation,
             deformable_groups=deformable_groups)
-        self.bn1 = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
+        self.gn1_bboxtower_stn = nn.GroupNorm(8, outplanes)
+        self.relu1_bboxtower_stn = nn.ReLU()
  
-        self.transform_matrix_conv2 = nn.Conv2d(outplanes, 4, 3, 1, 1, bias=True)            
-        self.stn_conv2 = DeformConv(
+        self.conv2_transform_matrix = nn.Conv2d(outplanes, 4, 3, 1, 1, bias=True)            
+        self.conv2_bboxtower_stn = DeformConv(
             outplanes,
             outplanes,
             kernel_size=3,
@@ -330,38 +333,32 @@ class STNBLOCK(nn.Module):
             padding=dilation,
             dilation=dilation,
             deformable_groups=deformable_groups)
-        self.bn2 = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
+        self.gn2_bboxtower_stn = nn.GroupNorm(8, outplanes)
  
-        self.relu = nn.ReLU(inplace=True)
+        self.relu2_bboxtower_stn = nn.ReLU()
  
     def forward(self, x):
-        residual = x
         (N,C,H,W) = x.shape
-        transform_matrix1 = self.transform_matrix_conv1(x)
+        transform_matrix1 = self.conv1_transform_matrix(x)
         transform_matrix1 = transform_matrix1.permute(0,2,3,1).reshape((N*H*W,2,2))
         offset1 = torch.matmul(transform_matrix1, self.regular_matrix)
         offset1 = offset1-self.regular_matrix
         offset1 = offset1.transpose(1,2)
         offset1 = offset1.reshape((N,H,W,18)).permute(0,3,1,2)
  
-        out = self.stn_conv1(x, offset1)
-        out = self.bn1(out)
-        out = self.relu(out)
+        out = self.conv1_bboxtower_stn(x, offset1)
+        out = self.gn1_bboxtower_stn(out)
+        out = self.relu1_bboxtower_stn(out)
  
-        transform_matrix2 = self.transform_matrix_conv2(out)
+        transform_matrix2 = self.conv2_transform_matrix(out)
         transform_matrix2 = transform_matrix2.permute(0,2,3,1).reshape((N*H*W,2,2))
         offset2 = torch.matmul(transform_matrix2, self.regular_matrix)
         offset2 = offset2-self.regular_matrix
         offset2 = offset2.transpose(1,2)
         offset2 = offset2.reshape((N,H,W,18)).permute(0,3,1,2)
-        out = self.stn_conv2(out, offset2)
-        out = self.bn2(out)
-        
-        if self.downsample is not None:
-            residual = self.downsample(x)
- 
-        out += residual
-        out = self.relu(out)
+        out = self.conv2_bboxtower_stn(out, offset2)
+        out = self.gn2_bboxtower_stn(out)
+        out = self.relu2_bboxtower_stn(out)
  
         return out
 
