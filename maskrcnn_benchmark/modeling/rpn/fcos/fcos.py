@@ -70,8 +70,6 @@ class FCOSHead(torch.nn.Module):
             in_channels, num_classes, kernel_size=3, stride=1,
             padding=1
         )
-
-        
         
         self.centerness = nn.Conv2d(
             in_channels, 1, kernel_size=3, stride=1,
@@ -99,22 +97,40 @@ class FCOSHead(torch.nn.Module):
         logits = []
         bbox_reg = []
         centerness = []
-        for l, feature in enumerate(x):
+        # print("input x", len(x), x)
+        if len(x) > 1:
+            for l, feature in enumerate(x):
+                # print("l and feature", l, feature.size(), type(feature))
+                cls_tower = self.cls_tower(feature)
+                logits.append(self.cls_logits(cls_tower))
+
+                # NOTE: Apply centerness branch on box tower lead to 0.5% improvement.
+                #       Just uncomment the line 91-93 and comment line 94-97.
+                # bbox_tower = self.bbox_tower(feature)
+                # bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
+                # centerness.append(self.centerness(bbox_tower))
+                        
+                # bbox_feature = self.transition_layer(feature)            
+                
+                if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
+                    bbox = []
+                    for i in range(4):
+                        bbox.append(self.bbox_pred[i](\
+                            self.bbox_tower[i](\
+                                feature[:,i*self.bbox_channels_perbranch:\
+                                    (i+1)*self.bbox_channels_perbranch])))
+                    bbox = torch.cat(bbox, dim=1)
+                    bbox_reg.append(torch.exp(self.scales[l](bbox)))
+                else:
+                    bbox_tower = self.bbox_tower(feature)
+                    bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
+
+                centerness.append(self.centerness(cls_tower))
+        else:
+            l = 0
+            feature = x[l].unsqueeze(0)
             cls_tower = self.cls_tower(feature)
             logits.append(self.cls_logits(cls_tower))
-
-             # NOTE: Apply centerness branch on box tower lead to 0.5% improvement.
-            #       Just uncomment the line 91-93 and comment line 94-97.
-            # bbox_tower = self.bbox_tower(feature)
-            # bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
-            # centerness.append(self.centerness(bbox_tower))
-                   
-
-            # ???The meaning for 4 channels. 
-            # l, r, t, b
-            # ???Disentangle should consider the physical meaning.
-            # bbox_feature = self.transition_layer(feature)            
-            
             if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
                 bbox = []
                 for i in range(4):
@@ -123,12 +139,13 @@ class FCOSHead(torch.nn.Module):
                             feature[:,i*self.bbox_channels_perbranch:\
                                 (i+1)*self.bbox_channels_perbranch])))
                 bbox = torch.cat(bbox, dim=1)
+                
                 bbox_reg.append(torch.exp(self.scales[l](bbox)))
             else:
                 bbox_tower = self.bbox_tower(feature)
                 bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
 
-            centerness.append(self.centerness(cls_tower))     
+            centerness.append(self.centerness(cls_tower))
 
         return logits, bbox_reg, centerness
 

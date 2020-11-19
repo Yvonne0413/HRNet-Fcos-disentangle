@@ -111,3 +111,46 @@ class HRFPN(nn.Module):
                     tmp_out = self.fpn_conv[i](outs[i])
                 outputs.append(tmp_out)
         return tuple(outputs)
+
+class HRTransit(nn.Module):
+    """
+    A simple transit model that acts as a bridge between backbone and predict head.
+    Input: 4 stage of hrnet output feature map.
+    Output: a concated 1/4 resulution feature map with 256 channels.
+
+    """
+
+    def __init__(self, in_channels, out_channels):
+        """
+        Arguments:
+            cfg              : config
+            in_channels (int): number of channels of the input feature
+            num_anchors (int): number of anchors to be predicted
+        """
+        super(HRTransit, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.transition_layer = nn.Sequential(
+            nn.Conv2d(sum(self.in_channels), self.out_channels,
+                        1, 1, 0, bias=False),
+            nn.BatchNorm2d(self.out_channels),
+            #GroupBN: GroupBN always used in Det
+            nn.ReLU(True))
+
+
+    def forward(self, inputs):
+        assert len(inputs) == len(self.in_channels)
+        # for i in range(len(inputs)):
+        #     print(inputs[i].size())
+        #     print(type(inputs[i]))
+
+        x0_h, x0_w = inputs[0].size(2), inputs[0].size(3)
+
+        x = torch.cat([inputs[0], \
+            F.upsample(inputs[1],size=(x0_h, x0_w), mode='bilinear'), \
+            F.upsample(inputs[2], size=(x0_h, x0_w), mode='bilinear'), \
+            F.upsample(inputs[3], size=(x0_h, x0_w), mode='bilinear')], 1)
+        
+        out = self.transition_layer(x)
+        # print(out.size())
+        return tuple(out)

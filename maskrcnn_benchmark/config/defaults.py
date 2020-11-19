@@ -32,6 +32,7 @@ _C.MODEL.CLS_AGNOSTIC_BBOX_REG = False
 _C.MODEL.SYNCBN = False
 _C.MODEL.USE_FPN = True
 
+
 # If the WEIGHT starts with a catalog://, like :R-50, the code will look for
 # the path in paths_catalog. Else, it will use it as the specified absolute
 # path
@@ -287,6 +288,7 @@ _C.MODEL.HRNET = CN()
 _C.MODEL.HRNET.OUT_CHANNEL = 256
 _C.MODEL.HRNET.FPN = CN()
 _C.MODEL.HRNET.FPN.TYPE = "HRFPN"
+_C.MODEL.HRNET.FPN.NOTYPE = "HRTransit"
 _C.MODEL.HRNET.FPN.OUT_CHANNEL = 256
 _C.MODEL.HRNET.FPN.CONV_STRIDE = 2
 
