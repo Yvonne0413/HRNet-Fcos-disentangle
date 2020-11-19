@@ -7,7 +7,7 @@ from .inference import make_fcos_postprocessor
 from .loss import make_fcos_loss_evaluator
 
 from maskrcnn_benchmark.layers import Scale
-from .bbox_module import make_bbox_tower, make_layer, make_final_layers
+from .bbox_module import make_bbox_tower, make_layer, make_final_layers, make_cls_tower
 
 class FCOSHead(torch.nn.Module):
     def __init__(self, cfg, in_channels):
@@ -21,19 +21,23 @@ class FCOSHead(torch.nn.Module):
         num_level = len(cfg.MODEL.FCOS.FPN_STRIDES)
         self.cfg = cfg
 
-        cls_tower = []
-        for i in range(cfg.MODEL.FCOS.NUM_CONVS):
-            cls_tower.append(
-                nn.Conv2d(
-                    in_channels,
-                    in_channels,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1
+
+        if cfg.MODEL.FCOS.CLS_TOWER.APPLY:
+            cls_tower = make_cls_tower(cfg.MODEL.FCOS, in_channels)
+        else:
+            cls_tower = []
+            for i in range(cfg.MODEL.FCOS.NUM_CONVS):
+                cls_tower.append(
+                    nn.Conv2d(
+                        in_channels,
+                        in_channels,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1
+                    )
                 )
-            )
-            cls_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS, in_channels))
-            cls_tower.append(nn.ReLU())
+                cls_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS, in_channels))
+                cls_tower.append(nn.ReLU())
         
 
         if cfg.MODEL.FCOS.MULTI_BRANCH_REG:

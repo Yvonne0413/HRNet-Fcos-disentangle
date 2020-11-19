@@ -274,8 +274,28 @@ blocks_dict = {
     'DEFORMABLE': DeformableBlock
 }
 
+def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
+    downsample = None
+    layers = []
+    if 0 in pos_tuple:
+        layers.append(block(group_num, inplanes, planes, 
+                stride, downsample, dilation=dilation))
+        inplanes = planes * block.expansion
+    else:
+        layers.append(FcosBlock(group_num, inplanes, planes, 
+                stride, downsample, dilation=dilation))
+        inplanes = planes * FcosBlock.expansion
 
-def make_layer(block, group_num, inplanes, planes, blocks, dilation=1, stride=1):
+    
+    for i in range(1, blocks):
+        if i in pos_tuple:
+            layers.append(block(group_num, inplanes, planes, dilation=dilation))
+        else:
+            layers.append(FcosBlock(group_num, inplanes, planes, dilation=dilation))
+
+    return nn.Sequential(*layers)
+
+def make_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
     downsample = None
     if stride != 1 or inplanes != planes * block.expansion:
         # what is block.expansion? the component set in block class.
@@ -286,11 +306,21 @@ def make_layer(block, group_num, inplanes, planes, blocks, dilation=1, stride=1)
         )
 
     layers = []
-    layers.append(block(group_num, inplanes, planes, 
-            stride, downsample, dilation=dilation))
-    inplanes = planes * block.expansion
-    for _ in range(1, blocks):
-        layers.append(block(group_num, inplanes, planes, dilation=dilation))
+    if 0 in pos_tuple:
+        layers.append(block(group_num, inplanes, planes, 
+                stride, downsample, dilation=dilation))
+        inplanes = planes * block.expansion
+    else:
+        layers.append(FcosBlock(group_num, inplanes, planes, 
+                stride, downsample, dilation=dilation))
+        inplanes = planes * FcosBlock.expansion
+
+    
+    for i in range(1, blocks):
+        if i in pos_tuple:
+            layers.append(block(group_num, inplanes, planes, dilation=dilation))
+        else:
+            layers.append(FcosBlock(group_num, inplanes, planes, dilation=dilation))
 
     return nn.Sequential(*layers)
 
@@ -324,6 +354,7 @@ def make_bbox_tower(layer_config):
         multi_branches.append(
             make_layer(
                 blocks_dict[layer_config['BLOCK']],
+                layer_config['POS_SPECIAL_BLOCKS'],
                 layer_config['GROUP_NORM_NUM'],
                 layer_config['NUM_CHANNELS_PERBRANCH'],
                 layer_config['NUM_CHANNELS_PERBRANCH'],
@@ -335,3 +366,16 @@ def make_bbox_tower(layer_config):
     return nn.ModuleList(multi_branches)
 
 
+def make_cls_tower(fcos_config, in_channels):
+    cls_tower = make_layer(
+                blocks_dict[fcos_config.BBOX_TOWER['BLOCK']],
+                fcos_config.BBOX_TOWER['POS_SPECIAL_BLOCKS'],
+                fcos_config.CLS_TOWER['GROUP_NORM_NUM'],
+                in_channels,
+                in_channels,
+                fcos_config['NUM_CONVS'],
+                1
+            )
+    return nn.Sequential(*cls_tower)
+
+    
