@@ -19,6 +19,7 @@ class FCOSHead(torch.nn.Module):
         # TODO: Implement the sigmoid version first.
         num_classes = cfg.MODEL.FCOS.NUM_CLASSES - 1
         num_level = len(cfg.MODEL.FCOS.FPN_STRIDES)
+        self.cfg = cfg
 
         cls_tower = []
         for i in range(cfg.MODEL.FCOS.NUM_CONVS):
@@ -31,19 +32,36 @@ class FCOSHead(torch.nn.Module):
                     padding=1
                 )
             )
-            cls_tower.append(nn.GroupNorm(32, in_channels))
+            cls_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS, in_channels))
             cls_tower.append(nn.ReLU())
-        self.add_module('cls_tower', nn.Sequential(*cls_tower))
-
         
-        self.bbox_channels_perbranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
-        bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
+
+        if cfg.MODEL.FCOS.MULTI_BRANCH_REG:
+            bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
+            
+            self.bbox_channels_perbranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
+            self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
+        else:
+            bbox_tower = []
+            for i in range(cfg.MODEL.FCOS.NUM_CONVS):
+                bbox_tower.append(
+                nn.Conv2d(
+                    in_channels,
+                    in_channels,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1
+                )
+            )
+            bbox_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS_BRANCH, in_channels))
+            bbox_tower.append(nn.ReLU())
+            self.bbox_pred = nn.Conv2d(
+                in_channels, 4, kernel_size=3, stride=1,
+                padding=1
+            )
+        
+        self.add_module('cls_tower', nn.Sequential(*cls_tower))
         self.add_module('bbox_tower', nn.Sequential(*bbox_tower))
-
-        self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
-
-        # not sure if need to delete the add_module bbox_tower
-
         self.cls_logits = nn.Conv2d(
             in_channels, num_classes, kernel_size=3, stride=1,
             padding=1
@@ -86,27 +104,28 @@ class FCOSHead(torch.nn.Module):
             # bbox_tower = self.bbox_tower(feature)
             # bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
             # centerness.append(self.centerness(bbox_tower))
-            centerness.append(self.centerness(cls_tower))            
+                   
 
             # ???The meaning for 4 channels. 
             # l, r, t, b
             # ???Disentangle should consider the physical meaning.
             # bbox_feature = self.transition_layer(feature)            
             
-            bbox = []
-            for i in range(4):
-                bbox.append(self.bbox_pred[i](\
-                    self.bbox_tower[i](\
-                        feature[:,i*self.bbox_channels_perbranch:\
-                            (i+1)*self.bbox_channels_perbranch])))
+            if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
+                bbox = []
+                for i in range(4):
+                    bbox.append(self.bbox_pred[i](\
+                        self.bbox_tower[i](\
+                            feature[:,i*self.bbox_channels_perbranch:\
+                                (i+1)*self.bbox_channels_perbranch])))
+                bbox = torch.cat(bbox, dim=1)
+                bbox_reg.append(torch.exp(self.scales[l](bbox)))
+            else:
+                bbox_tower = self.bbox_tower(feature)
+                bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
 
-            bbox = torch.cat(bbox, dim=1)
-            bbox_reg.append(torch.exp(self.scales[l](bbox)))
-            
+            centerness.append(self.centerness(cls_tower))     
 
-            
-
-           
         return logits, bbox_reg, centerness
 
 

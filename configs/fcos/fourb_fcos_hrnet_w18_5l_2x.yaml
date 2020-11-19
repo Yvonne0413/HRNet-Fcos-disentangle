@@ -10,7 +10,7 @@ MODEL:
     BBOX_TOWER:
       BLOCK: "FCOS"
       NUM_CHANNELS_PERBRANCH: 64
-      NUM_BLOCKS: 2
+      NUM_BLOCKS: 4
       DILATION_RATE: 1
 DATASETS:
   TRAIN: ("coco_2014_train", "coco_2014_valminusminival")

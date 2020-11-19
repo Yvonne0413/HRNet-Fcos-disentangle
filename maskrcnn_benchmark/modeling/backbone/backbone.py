@@ -118,6 +118,7 @@ def build_hrnet_fpn_backbone(cfg):
             fuse_method='SUM')
     )
     fpn_in_channels = [width, width * 2, width * 4, width * 8]
+    print("########fpn_in_channels", fpn_in_channels)
 
     hrnet.BatchNorm2d = nn.SyncBatchNorm if cfg.MODEL.SYNCBN else nn.BatchNorm2d
     body = hrnet.HighResolutionNet(extra=hrnet_args)
@@ -127,8 +128,13 @@ def build_hrnet_fpn_backbone(cfg):
         conv_stride=cfg.MODEL.HRNET.FPN.CONV_STRIDE,
         num_level=len(cfg.MODEL.FCOS.FPN_STRIDES),
     )
-    model = nn.Sequential(OrderedDict([("body", body), ("fpn", fpn)]))
-    model.out_channels = cfg.MODEL.HRNET.FPN.OUT_CHANNEL
+    if cfg.MODEL.USE_FPN:
+        model = nn.Sequential(OrderedDict([("body", body), ("fpn", fpn)]))
+        model.out_channels = cfg.MODEL.HRNET.FPN.OUT_CHANNEL
+    else:
+        model = nn.Sequential(OrderedDict([("body", body)]))
+        model.out_channels = cfg.MODEL.HRNET.OUT_CHANNEL
+        # model.out_channels = fpn_in_channels
     return model
 
 

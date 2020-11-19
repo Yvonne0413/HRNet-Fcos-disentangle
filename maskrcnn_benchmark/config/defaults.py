@@ -30,6 +30,7 @@ _C.MODEL.DEVICE = "cuda"
 _C.MODEL.META_ARCHITECTURE = "GeneralizedRCNN"
 _C.MODEL.CLS_AGNOSTIC_BBOX_REG = False
 _C.MODEL.SYNCBN = False
+_C.MODEL.USE_FPN = True
 
 # If the WEIGHT starts with a catalog://, like :R-50, the code will look for
 # the path in paths_catalog. Else, it will use it as the specified absolute
@@ -116,6 +117,7 @@ _C.MODEL.GROUP_NORM = CN()
 _C.MODEL.GROUP_NORM.DIM_PER_GP = -1
 # Number of groups in GroupNorm (-1 if using DIM_PER_GP)
 _C.MODEL.GROUP_NORM.NUM_GROUPS = 32
+_C.MODEL.GROUP_NORM.NUM_GROUPS_BRANCH = 8
 # GroupNorm's small constant in the denominator
 _C.MODEL.GROUP_NORM.EPSILON = 1e-5
 
@@ -282,6 +284,7 @@ _C.MODEL.RESNETS.STEM_OUT_CHANNELS = 64
 # HRNet options
 # ---------------------------------------------------------------------------- #
 _C.MODEL.HRNET = CN()
+_C.MODEL.HRNET.OUT_CHANNEL = 256
 _C.MODEL.HRNET.FPN = CN()
 _C.MODEL.HRNET.FPN.TYPE = "HRFPN"
 _C.MODEL.HRNET.FPN.OUT_CHANNEL = 256
@@ -295,8 +298,11 @@ _C.MODEL.FCOS.BBOX_TOWER = CN()
 _C.MODEL.FCOS.BBOX_TOWER.BLOCK = 'FCOS'
 # ('FCOS', 'FCOSBN', 'FCOSSKIP', 'BASIC', 'STNBLOCK', 'TRANSSTNBLOCK', 'DEFORMABLE')
 _C.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH = 64
-_C.MODEL.FCOS.BBOX_TOWER.NUM_BLOCKS = 2
+_C.MODEL.FCOS.BBOX_TOWER.GROUP_NORM_NUM = 8
+_C.MODEL.FCOS.BBOX_TOWER.NUM_BLOCKS = 4
+_C.MODEL.FCOS.BBOX_TOWER.NUM_SPECIAL_BLOCKS = [0, 1, 2, 3]
 _C.MODEL.FCOS.BBOX_TOWER.DILATION_RATE = 1
+_C.MODEL.FCOS.MULTI_BRANCH_REG = False
 _C.MODEL.FCOS.NUM_CLASSES = 81  # the number of classes including background
 _C.MODEL.FCOS.FPN_STRIDES = [8, 16, 32, 64, 128]
 _C.MODEL.FCOS.TARGET_ASSIGN = [[-1, 64], [64, 128], [128, 256], [256, 512], [512, 100000000]]
