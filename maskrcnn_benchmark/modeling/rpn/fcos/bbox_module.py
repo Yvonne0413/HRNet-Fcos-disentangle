@@ -177,6 +177,59 @@ class DeformableBlock(nn.Module):
         return out
 
 
+class DeformableSkipBlock(nn.Module):
+    # Different from Pose basicblock: 
+    # 1. GroupNorm for det - BatchNorm for pose
+    # 2. No skip conn for det - skip conn for pose
+    expansion = 1
+
+    def __init__(self, group_num, inplanes, outplanes, stride=1, 
+            downsample=None, deformable_groups=1, dilation=1):
+        super(DeformableSkipBlock, self).__init__()
+        self.conv_offset_1 = nn.Conv2d(inplanes, 18, 3, 1, 1, bias=True)
+        self.conv_offset_2 = nn.Conv2d(inplanes, 18, 3, 1, 1, bias=True)
+
+        self.conv1_bboxtower_def = DeformConv(
+            inplanes,
+            outplanes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation,
+            dilation=dilation,
+            deformable_groups=deformable_groups)
+        self.gn1_bboxtower_def = nn.GroupNorm(group_num, outplanes)
+        self.relu1_bboxtower_def = nn.ReLU()
+
+        self.conv2_bboxtower_def = DeformConv(
+            outplanes,
+            outplanes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation,
+            dilation=dilation,
+            deformable_groups=deformable_groups)
+        self.gn2_bboxtower_def = nn.GroupNorm(group_num, outplanes)
+        self.relu2_bboxtower_def = nn.ReLU()
+
+        self.downsample = downsample
+
+    def forward(self, x):
+        residual = x
+        offset = self.conv_offset_1(x)
+        out = self.conv1_bboxtower_def(x, offset)
+        out = self.gn1_bboxtower_def(out)
+        out = self.relu1_bboxtower_def(out)
+
+        offset_2 = self.conv_offset_2(out)
+        out = self.conv2_bboxtower_def(out, offset_2)
+        out = self.gn2_bboxtower_def(out)
+
+        out += residual
+        out = self.relu2_bboxtower_def(out)
+
+        return out
+
+
 class TRANSSTNBLOCK(nn.Module):
     # Different from Pose basicblock: 
     # 1. GroupNorm for det - BatchNorm for pose
@@ -220,6 +273,80 @@ class TRANSSTNBLOCK(nn.Module):
         out = self.conv_transstn(x, offset)
         out = self.gn_bboxtower_transstn(out)
         out = self.relu_bboxtower_transstn(out)
+ 
+        return out
+
+
+class TransstnSkipBlock(nn.Module):
+    # Different from Pose basicblock: 
+    # 1. GroupNorm for det - BatchNorm for pose
+    # 2. No skip conn for det - skip conn for pose
+    expansion = 1
+    
+    def __init__(self, group_num, inplanes, outplanes, stride=1, 
+            downsample=None, dilation=1, deformable_groups=1):
+        super(TransstnSkipBlock, self).__init__()
+        regular_matrix = torch.tensor(np.array([[-1, -1, -1, 0, 0, 0, 1, 1, 1], \
+                                                [-1, 0, 1, -1 ,0 ,1 ,-1, 0, 1]]))
+        self.register_buffer('regular_matrix', regular_matrix.float())
+        self.downsample = downsample
+        self.conv1_transform_matrix_transstn = nn.Conv2d(inplanes, 4, 3, 1, 1, bias=True)
+        self.conv1_translation_transstn = nn.Conv2d(inplanes, 2, 3, 1, 1, bias=True)
+        self.conv1_transstn = DeformConv(
+            inplanes,
+            outplanes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation,
+            dilation=dilation,
+            deformable_groups=deformable_groups)
+        self.gn1_bboxtower_transstn = nn.GroupNorm(group_num, outplanes)
+        self.relu1_bboxtower_transstn = nn.ReLU()
+ 
+        self.conv2_transform_matrix_transstn = nn.Conv2d(outplanes, 4, 3, 1, 1, bias=True)      
+        self.conv2_translation_transstn = nn.Conv2d(outplanes, 2, 3, 1, 1, bias=True)      
+        self.conv2_transstn = DeformConv(
+            outplanes,
+            outplanes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation,
+            dilation=dilation,
+            deformable_groups=deformable_groups)
+        self.gn2_bboxtower_transstn = nn.GroupNorm(group_num, outplanes)
+        self.relu2_bboxtower_transstn = nn.ReLU()
+ 
+    def forward(self, x):
+        residual = x
+        (N,C,H,W) = x.shape
+        transform_matrix1 = self.conv1_transform_matrix_transstn(x)
+        translation1 = self.conv1_translation_transstn(x)
+        transform_matrix1 = transform_matrix1.permute(0,2,3,1).reshape((N*H*W,2,2))
+        offset1 = torch.matmul(transform_matrix1, self.regular_matrix)
+        offset1 = offset1-self.regular_matrix
+        offset1 = offset1.transpose(1,2)
+        offset1 = offset1.reshape((N,H,W,18)).permute(0,3,1,2)
+        offset1[:,0::2,:,:] += translation1[:,0:1,:,:]
+        offset1[:,1::2,:,:] += translation1[:,1:2,:,:]
+ 
+        out = self.conv1_transstn(x, offset1)
+        out = self.gn1_bboxtower_transstn(out)
+        out = self.relu1_bboxtower_transstn(out)
+
+        transform_matrix2 = self.conv2_transform_matrix_transstn(out)
+        translation2 = self.conv2_translation_transstn(out)
+        transform_matrix2 = transform_matrix2.permute(0,2,3,1).reshape((N*H*W,2,2))
+        offset2 = torch.matmul(transform_matrix2, self.regular_matrix)
+        offset2 = offset2-self.regular_matrix
+        offset2 = offset2.transpose(1,2)
+        offset2 = offset2.reshape((N,H,W,18)).permute(0,3,1,2)
+        offset2[:,0::2,:,:] += translation2[:,0:1,:,:]
+        offset2[:,1::2,:,:] += translation2[:,1:2,:,:]
+ 
+        out = self.conv2_transstn(out, offset2)
+        out = self.gn2_bboxtower_transstn(out)
+        out += residual
+        out = self.relu2_bboxtower_transstn(out)
  
         return out
 
@@ -271,7 +398,9 @@ blocks_dict = {
     'BASIC': BasicBlock,
     'STNBLOCK': STNBLOCK,
     'TRANSSTNBLOCK': TRANSSTNBLOCK,
-    'DEFORMABLE': DeformableBlock
+    'DEFORMABLE': DeformableBlock,
+    'DEFSKIP': DeformableSkipBlock,
+    'TRANSSKIP': TransstnSkipBlock
 }
 
 def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
@@ -328,11 +457,11 @@ def make_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1
 def make_final_layers(layer_config):
     final_layers = []
 
-    for i in range(4):
+    for i in range(layer_config['NUM_BRANCHES']):
         final_layers.append(
             nn.Conv2d(
                 in_channels=layer_config['NUM_CHANNELS_PERBRANCH'],
-                out_channels=1,
+                out_channels=layer_config['OUT_CHANNELS_PERBRANCH'],
                 kernel_size=3,
                 stride=1,
                 padding=1
@@ -350,7 +479,7 @@ def make_bbox_tower(layer_config):
     # print(layer_config['NUM_BLOCKS'])
     # print(layer_config['DILATION_RATE'])
 
-    for i in range(4):
+    for i in range(layer_config['NUM_BRANCHES']):
         multi_branches.append(
             make_layer(
                 blocks_dict[layer_config['BLOCK']],

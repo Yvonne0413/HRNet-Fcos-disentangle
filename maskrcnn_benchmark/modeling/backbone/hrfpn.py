@@ -112,6 +112,9 @@ class HRFPN(nn.Module):
                 outputs.append(tmp_out)
         return tuple(outputs)
 
+# class HRTransit(nn.Module):
+
+
 class HRTransit(nn.Module):
     """
     A simple transit model that acts as a bridge between backbone and predict head.

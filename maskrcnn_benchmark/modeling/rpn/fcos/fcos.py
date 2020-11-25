@@ -21,7 +21,6 @@ class FCOSHead(torch.nn.Module):
         num_level = len(cfg.MODEL.FCOS.FPN_STRIDES)
         self.cfg = cfg
 
-
         if cfg.MODEL.FCOS.CLS_TOWER.APPLY:
             cls_tower = make_cls_tower(cfg.MODEL.FCOS, in_channels)
         else:
@@ -38,12 +37,17 @@ class FCOSHead(torch.nn.Module):
                 )
                 cls_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS, in_channels))
                 cls_tower.append(nn.ReLU())
-        
 
         if cfg.MODEL.FCOS.MULTI_BRANCH_REG:
-            bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
-            
+            bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)     
             self.bbox_channels_perbranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
+            if self.bbox_channels_perbranch * cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
+                self.transition_layer = nn.Sequential(
+                    nn.Conv2d(in_channels, self.bbox_channels_perbranch*4,
+                                1, 1, 0, bias=False),
+                    nn.GroupNorm(self.bbox_channels_perbranch//2, self.bbox_channels_perbranch*4),
+                    #GroupBN: GroupBN always used in Det
+                    nn.ReLU())
             self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
         else:
             bbox_tower = []
@@ -55,10 +59,10 @@ class FCOSHead(torch.nn.Module):
                     kernel_size=3,
                     stride=1,
                     padding=1
+                    )
                 )
-            )
-            bbox_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS_BRANCH, in_channels))
-            bbox_tower.append(nn.ReLU())
+                bbox_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS, in_channels))
+                bbox_tower.append(nn.ReLU())
             self.bbox_pred = nn.Conv2d(
                 in_channels, 4, kernel_size=3, stride=1,
                 padding=1
@@ -113,8 +117,10 @@ class FCOSHead(torch.nn.Module):
                 # bbox_feature = self.transition_layer(feature)            
                 
                 if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
+                    if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
+                        feature = self.transition_layer(feature)
                     bbox = []
-                    for i in range(4):
+                    for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
                         bbox.append(self.bbox_pred[i](\
                             self.bbox_tower[i](\
                                 feature[:,i*self.bbox_channels_perbranch:\
@@ -132,14 +138,15 @@ class FCOSHead(torch.nn.Module):
             cls_tower = self.cls_tower(feature)
             logits.append(self.cls_logits(cls_tower))
             if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
+                if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
+                        feature = self.transition_layer(feature)
                 bbox = []
-                for i in range(4):
+                for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
                     bbox.append(self.bbox_pred[i](\
                         self.bbox_tower[i](\
                             feature[:,i*self.bbox_channels_perbranch:\
                                 (i+1)*self.bbox_channels_perbranch])))
                 bbox = torch.cat(bbox, dim=1)
-                
                 bbox_reg.append(torch.exp(self.scales[l](bbox)))
             else:
                 bbox_tower = self.bbox_tower(feature)
