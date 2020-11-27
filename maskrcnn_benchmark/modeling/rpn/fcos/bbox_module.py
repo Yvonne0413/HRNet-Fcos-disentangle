@@ -350,6 +350,50 @@ class TransstnSkipBlock(nn.Module):
  
         return out
 
+'''
+class STRANSSTNBLOCK(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, outplanes, stride=1, 
+    downsample=None, dilation=1, deformable_groups=1):
+        super(STRANSSTNBLOCK, self).__init__()
+        regular_matrix = torch.tensor(np.array([[-1, -1, -1, 0, 0, 0, 1, 1, 1], \
+                                                [-1, 0, 1, -1 ,0 ,1 ,-1, 0, 1]]))
+        self.register_buffer('regular_matrix', regular_matrix.float())
+        self.downsample = downsample
+        self.transform_matrix_conv1 = nn.Conv2d(inplanes, 4, 3, 1, 1, bias=True)
+        self.translation_conv1 = nn.Conv2d(inplanes, 2, 3, 1, 1, bias=True)
+        self.stn_conv1 = DeformConv(
+            inplanes,
+            outplanes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation,
+            dilation=dilation,
+            deformable_groups=deformable_groups)
+        self.bn1 = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
+        self.relu = nn.ReLU(inplace=True)
+    def forward(self, x):
+        residual = x
+        (N,C,H,W) = x.shape
+        transform_matrix1 = self.transform_matrix_conv1(x)
+        translation1 = self.translation_conv1(x)
+        transform_matrix1 = transform_matrix1.permute(0,2,3,1).reshape((N*H*W,2,2))
+        offset1 = torch.matmul(transform_matrix1, self.regular_matrix)
+        offset1 = offset1-self.regular_matrix
+        offset1 = offset1.transpose(1,2)
+        offset1 = offset1.reshape((N,H,W,18)).permute(0,3,1,2)
+        offset1[:,0::2,:,:] += translation1[:,0:1,:,:]
+        offset1[:,1::2,:,:] += translation1[:,1:2,:,:]
+        out = self.stn_conv1(x, offset1)
+        out = self.bn1(out)
+        
+        if self.downsample is not None:
+            residual = self.downsample(x)
+        out += residual
+        out = self.relu(out)
+        return out
+'''
 
 class STNBLOCK(nn.Module):
     # Different from Pose basicblock: 
@@ -391,6 +435,7 @@ class STNBLOCK(nn.Module):
         return out
 
 
+
 blocks_dict = {
     'FCOS': FcosBlock,
     'FCOSBN': FcosBnBlock,
@@ -400,7 +445,7 @@ blocks_dict = {
     'TRANSSTNBLOCK': TRANSSTNBLOCK,
     'DEFORMABLE': DeformableBlock,
     'DEFSKIP': DeformableSkipBlock,
-    'TRANSSKIP': TransstnSkipBlock
+    'TRANSSKIP': TransstnSkipBlock,
 }
 
 def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
@@ -424,7 +469,7 @@ def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilati
 
     return nn.Sequential(*layers)
 
-def make_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
+def make_layer(in_channels, block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
     downsample = None
     if stride != 1 or inplanes != planes * block.expansion:
         # what is block.expansion? the component set in block class.
@@ -435,6 +480,15 @@ def make_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1
         )
 
     layers = []
+    if in_channels != inplanes:
+        transition_layer = nn.Sequential(
+            nn.Conv2d(in_channels, inplanes,
+                        1, 1, 0, bias=False),
+            nn.GroupNorm(inplanes//8, inplanes),
+            #GroupBN: GroupBN always used in Det
+            nn.ReLU())
+        layers.append(transition_layer)
+
     if 0 in pos_tuple:
         layers.append(block(group_num, inplanes, planes, 
                 stride, downsample, dilation=dilation))
@@ -471,7 +525,7 @@ def make_final_layers(layer_config):
     return nn.ModuleList(final_layers)
 
 
-def make_bbox_tower(layer_config):
+def make_bbox_tower(layer_config, in_channels):
     multi_branches = []
 
     # print(layer_config['BLOCK'])
@@ -482,6 +536,7 @@ def make_bbox_tower(layer_config):
     for i in range(layer_config['NUM_BRANCHES']):
         multi_branches.append(
             make_layer(
+                in_channels,
                 blocks_dict[layer_config['BLOCK']],
                 layer_config['POS_SPECIAL_BLOCKS'],
                 layer_config['GROUP_NORM_NUM'],
@@ -497,6 +552,7 @@ def make_bbox_tower(layer_config):
 
 def make_cls_tower(fcos_config, in_channels):
     cls_tower = make_layer(
+                False,
                 blocks_dict[fcos_config.BBOX_TOWER['BLOCK']],
                 fcos_config.BBOX_TOWER['POS_SPECIAL_BLOCKS'],
                 fcos_config.CLS_TOWER['GROUP_NORM_NUM'],

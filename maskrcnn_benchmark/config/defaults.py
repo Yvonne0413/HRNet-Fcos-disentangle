@@ -309,6 +309,7 @@ _C.MODEL.FCOS.BBOX_TOWER.GROUP_NORM_NUM = 8
 _C.MODEL.FCOS.BBOX_TOWER.NUM_BLOCKS = 4
 _C.MODEL.FCOS.BBOX_TOWER.POS_SPECIAL_BLOCKS = ('0,1,2,3',)
 _C.MODEL.FCOS.BBOX_TOWER.DILATION_RATE = 1
+_C.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION = 0  # 0 means increase the channel to a sum and then split, 1 means first split and then increase
 _C.MODEL.FCOS.MULTI_BRANCH_REG = False
 _C.MODEL.FCOS.NUM_CLASSES = 81  # the number of classes including background
 _C.MODEL.FCOS.FPN_STRIDES = [8, 16, 32, 64, 128]

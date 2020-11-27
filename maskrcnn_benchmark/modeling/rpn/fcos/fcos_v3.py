@@ -20,9 +20,6 @@ class FCOSHead(torch.nn.Module):
         num_classes = cfg.MODEL.FCOS.NUM_CLASSES - 1
         num_level = len(cfg.MODEL.FCOS.FPN_STRIDES)
         self.cfg = cfg
-        self.in_channels = in_channels
-        self.bbox_in_channels = in_channels
-        self.branch_channel_transit = False
 
         if cfg.MODEL.FCOS.CLS_TOWER.APPLY:
             cls_tower = make_cls_tower(cfg.MODEL.FCOS, in_channels)
@@ -42,25 +39,15 @@ class FCOSHead(torch.nn.Module):
                 cls_tower.append(nn.ReLU())
 
         if cfg.MODEL.FCOS.MULTI_BRANCH_REG:
+            bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)     
             self.bbox_channels_perbranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
-            if self.bbox_channels_perbranch * cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != in_channels:
-                if self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 0:
-                    self.transition_layer = nn.Sequential(
-                        nn.Conv2d(in_channels, self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES,
-                                    1, 1, 0, bias=False),
-                        nn.GroupNorm(self.bbox_channels_perbranch//2, self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES),
-                        #GroupBN: GroupBN always used in Det
-                        nn.ReLU())
-                    self.bbox_in_channels = self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-                # elif self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 1:
-                #     self.transition_layer = nn.Sequential(
-                #         nn.Conv2d(in_channels//cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES, self.bbox_channels_perbranch,
-                #                     1, 1, 0, bias=False),
-                #         nn.GroupNorm(self.bbox_channels_perbranch//8, self.bbox_channels_perbranch),
-                #         #GroupBN: GroupBN always used in Det
-                #         nn.ReLU())
-
-            bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER, self.bbox_in_channels//cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES)     
+            if self.bbox_channels_perbranch * cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
+                self.transition_layer = nn.Sequential(
+                    nn.Conv2d(in_channels, self.bbox_channels_perbranch*4,
+                                1, 1, 0, bias=False),
+                    nn.GroupNorm(self.bbox_channels_perbranch//2, self.bbox_channels_perbranch*4),
+                    #GroupBN: GroupBN always used in Det
+                    nn.ReLU())
             self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
         else:
             bbox_tower = []
@@ -166,41 +153,53 @@ class FCOSHead(torch.nn.Module):
         bbox_reg = []
         centerness = []
         # print("input x", len(x), x)
-        # add the following two lines for w/o fpn
-        if len(x) == 1:
-            x = [x[0].unsqueeze(0)]
+        if len(x) > 1:
+            for l, feature in enumerate(x):
+                # print("l and feature", l, feature.size(), type(feature))
+                cls_tower = self.cls_tower(feature)
+                logits.append(self.cls_logits(cls_tower))
 
-        for l, feature in enumerate(x):
-            # print("l and feature", l, feature.size(), type(feature))
+                # NOTE: Apply centerness branch on box tower lead to 0.5% improvement.
+                #       Just uncomment the line 91-93 and comment line 94-97.
+                # bbox_tower = self.bbox_tower(feature)
+                # bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
+                # centerness.append(self.centerness(bbox_tower))
+                        
+                # bbox_feature = self.transition_layer(feature)            
+                
+                if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
+                    if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
+                        feature = self.transition_layer(feature)
+                    bbox = []
+                    for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
+                        bbox.append(self.bbox_pred[i](\
+                            self.bbox_tower[i](\
+                                feature[:,i*self.bbox_channels_perbranch:\
+                                    (i+1)*self.bbox_channels_perbranch])))
+                    bbox = torch.cat(bbox, dim=1)
+                    bbox_reg.append(torch.exp(self.scales[l](bbox)))
+                else:
+                    bbox_tower = self.bbox_tower(feature)
+                    bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
+
+                centerness.append(self.centerness(cls_tower))
+        else:
+            l = 0
+            feature = x[l].unsqueeze(0)
             cls_tower = self.cls_tower(feature)
             logits.append(self.cls_logits(cls_tower))
-
-            # NOTE: Apply centerness branch on box tower lead to 0.5% improvement.
-            #       Just uncomment the line 91-93 and comment line 94-97.
-            # bbox_tower = self.bbox_tower(feature)
-            # bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
-            # centerness.append(self.centerness(bbox_tower))
-                    
-            # bbox_feature = self.transition_layer(feature)            
-            
             if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
-                if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.in_channels:
+                if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
                     if self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 0:
                         feature = self.transition_layer(feature)
-                        # bbox_in_channels = self.bbox_in_channels * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-                    # elif self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 1:
-                    #     feature_list = []
-                    #     for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
-                    #         feature_i = self.transition_layer(feature[:,i*self.bbox_channels_perbranch:\
-                    #             (i+1)*self.bbox_channels_perbranch])   
-                               
+                    else:
+
                 bbox = []
-                split_channels = self.bbox_in_channels // self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
                 for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
                     bbox.append(self.bbox_pred[i](\
                         self.bbox_tower[i](\
-                            feature[:,i*split_channels:\
-                                (i+1)*split_channels])))
+                            feature[:,i*self.bbox_channels_perbranch:\
+                                (i+1)*self.bbox_channels_perbranch])))
                 bbox = torch.cat(bbox, dim=1)
                 bbox_reg.append(torch.exp(self.scales[l](bbox)))
             else:
@@ -208,30 +207,6 @@ class FCOSHead(torch.nn.Module):
                 bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
 
             centerness.append(self.centerness(cls_tower))
-        # else:
-        #     l = 0
-        #     feature = x[l].unsqueeze(0)
-        #     cls_tower = self.cls_tower(feature)
-        #     logits.append(self.cls_logits(cls_tower))
-        #     if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
-        #         if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
-        #             if self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 0:
-        #                 feature = self.transition_layer(feature)
-        #             else:
-
-        #         bbox = []
-        #         for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
-        #             bbox.append(self.bbox_pred[i](\
-        #                 self.bbox_tower[i](\
-        #                     feature[:,i*self.bbox_channels_perbranch:\
-        #                         (i+1)*self.bbox_channels_perbranch])))
-        #         bbox = torch.cat(bbox, dim=1)
-        #         bbox_reg.append(torch.exp(self.scales[l](bbox)))
-        #     else:
-        #         bbox_tower = self.bbox_tower(feature)
-        #         bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
-
-        #     centerness.append(self.centerness(cls_tower))
 
         return logits, bbox_reg, centerness
 
@@ -330,3 +305,49 @@ class FCOSModule(torch.nn.Module):
 
 def build_fcos(cfg, in_channels):
     return FCOSModule(cfg, in_channels)
+
+
+'''
+class STRANSSTNBLOCK(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, outplanes, stride=1, 
+    downsample=None, dilation=1, deformable_groups=1):
+        super(STRANSSTNBLOCK, self).__init__()
+        regular_matrix = torch.tensor(np.array([[-1, -1, -1, 0, 0, 0, 1, 1, 1], \
+                                                [-1, 0, 1, -1 ,0 ,1 ,-1, 0, 1]]))
+        self.register_buffer('regular_matrix', regular_matrix.float())
+        self.downsample = downsample
+        self.transform_matrix_conv1 = nn.Conv2d(inplanes, 4, 3, 1, 1, bias=True)
+        self.translation_conv1 = nn.Conv2d(inplanes, 2, 3, 1, 1, bias=True)
+        self.stn_conv1 = DeformConv(
+            inplanes,
+            outplanes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation,
+            dilation=dilation,
+            deformable_groups=deformable_groups)
+        self.bn1 = nn.BatchNorm2d(outplanes, momentum=BN_MOMENTUM)
+        self.relu = nn.ReLU(inplace=True)
+    def forward(self, x):
+        residual = x
+        (N,C,H,W) = x.shape
+        transform_matrix1 = self.transform_matrix_conv1(x)
+        translation1 = self.translation_conv1(x)
+        transform_matrix1 = transform_matrix1.permute(0,2,3,1).reshape((N*H*W,2,2))
+        offset1 = torch.matmul(transform_matrix1, self.regular_matrix)
+        offset1 = offset1-self.regular_matrix
+        offset1 = offset1.transpose(1,2)
+        offset1 = offset1.reshape((N,H,W,18)).permute(0,3,1,2)
+        offset1[:,0::2,:,:] += translation1[:,0:1,:,:]
+        offset1[:,1::2,:,:] += translation1[:,1:2,:,:]
+        out = self.stn_conv1(x, offset1)
+        out = self.bn1(out)
+        
+        if self.downsample is not None:
+            residual = self.downsample(x)
+        out += residual
+        out = self.relu(out)
+        return out
+'''
