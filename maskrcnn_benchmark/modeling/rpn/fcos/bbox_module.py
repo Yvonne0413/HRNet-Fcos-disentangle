@@ -254,11 +254,10 @@ class TRANSSTNBLOCK(nn.Module):
             dilation=dilation,
             deformable_groups=deformable_groups)
         self.gn_bboxtower_transstn = nn.GroupNorm(group_num, outplanes)
- 
         self.relu_bboxtower_transstn = nn.ReLU()
  
     def forward(self, x):
-        # residual = x
+        residual = x
         (N,C,H,W) = x.shape
         transform_matrix = self.conv_transform_matrix_transstn(x)
         translation = self.conv_translation_transstn(x)
@@ -269,11 +268,10 @@ class TRANSSTNBLOCK(nn.Module):
         offset = offset.reshape((N,H,W,18)).permute(0,3,1,2)
         offset[:,0::2,:,:] += translation[:,0:1,:,:]
         offset[:,1::2,:,:] += translation[:,1:2,:,:]
- 
         out = self.conv_transstn(x, offset)
         out = self.gn_bboxtower_transstn(out)
+        out += residual
         out = self.relu_bboxtower_transstn(out)
- 
         return out
 
 
@@ -445,11 +443,19 @@ blocks_dict = {
     'TRANSSTNBLOCK': TRANSSTNBLOCK,
     'DEFORMABLE': DeformableBlock,
     'DEFSKIP': DeformableSkipBlock,
-    'TRANSSKIP': TransstnSkipBlock,
+    'TRANSSKIP': TransstnSkipBlock
 }
 
 def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
     downsample = None
+    if stride != 1 or inplanes != planes * block.expansion:
+        # what is block.expansion? the component set in block class.
+        downsample = nn.Sequential(
+            nn.Conv2d(inplanes, planes * block.expansion,
+                        kernel_size=1, stride=stride, bias=False),
+            nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
+        )
+
     layers = []
     if 0 in pos_tuple:
         layers.append(block(group_num, inplanes, planes, 
@@ -469,7 +475,7 @@ def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilati
 
     return nn.Sequential(*layers)
 
-def make_layer(in_channels, block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
+def make_layer(in_channels, option, block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
     downsample = None
     if stride != 1 or inplanes != planes * block.expansion:
         # what is block.expansion? the component set in block class.
@@ -481,13 +487,17 @@ def make_layer(in_channels, block, pos_tuple, group_num, inplanes, planes, block
 
     layers = []
     if in_channels != inplanes:
-        transition_layer = nn.Sequential(
-            nn.Conv2d(in_channels, inplanes,
-                        1, 1, 0, bias=False),
-            nn.GroupNorm(inplanes//8, inplanes),
-            #GroupBN: GroupBN always used in Det
-            nn.ReLU())
-        layers.append(transition_layer)
+        if option == 1:
+            transition_layer = nn.Sequential(
+                nn.Conv2d(in_channels, inplanes,
+                            1, 1, 0, bias=False),
+                nn.GroupNorm(inplanes//8, inplanes),
+                #GroupBN: GroupBN always used in Det
+                nn.ReLU())
+            layers.append(transition_layer)
+        elif option == 3:
+            inplanes = in_channels
+    
 
     if 0 in pos_tuple:
         layers.append(block(group_num, inplanes, planes, 
@@ -537,6 +547,7 @@ def make_bbox_tower(layer_config, in_channels):
         multi_branches.append(
             make_layer(
                 in_channels,
+                layer_config['CHANNEL_OPTION'],
                 blocks_dict[layer_config['BLOCK']],
                 layer_config['POS_SPECIAL_BLOCKS'],
                 layer_config['GROUP_NORM_NUM'],
@@ -551,15 +562,15 @@ def make_bbox_tower(layer_config, in_channels):
 
 
 def make_cls_tower(fcos_config, in_channels):
-    cls_tower = make_layer(
-                False,
+
+    cls_tower = make_cls_layer(
                 blocks_dict[fcos_config.BBOX_TOWER['BLOCK']],
                 fcos_config.BBOX_TOWER['POS_SPECIAL_BLOCKS'],
                 fcos_config.CLS_TOWER['GROUP_NORM_NUM'],
                 in_channels,
                 in_channels,
                 fcos_config['NUM_CONVS'],
-                1
+                fcos_config.BBOX_TOWER['DILATION_RATE']
             )
     return nn.Sequential(*cls_tower)
 
