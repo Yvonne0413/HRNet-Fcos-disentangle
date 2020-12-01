@@ -5,7 +5,6 @@ Implements the Generalized R-CNN framework
 
 import torch
 from torch import nn
-from torch.autograd import Variable
 
 from maskrcnn_benchmark.structures.image_list import to_image_list
 
@@ -31,22 +30,7 @@ class GeneralizedRCNN(nn.Module):
         self.rpn = build_rpn(cfg, self.backbone.out_channels)
         self.roi_heads = build_roi_heads(cfg, self.backbone.out_channels)
 
-        # for visualization
-        self.gradients = None
-        self.hook_layers()
-        
-    def hook_layers(self):
-        def hook_function(module, grad_in, grad_out):
-            self.gradients = grad_in[0]
-            # print(grad_in[0])
-
-        # Register hook to the first layer
-        # first_layer = self.model.module.conv1
-        first_layer = self.backbone.body.conv1
-        print(first_layer)
-        first_layer.register_backward_hook(hook_function)
-
-    def forward(self, images, targets=None, offset_idx=None):
+    def forward(self, images, targets=None):
         """
         Arguments:
             images (list[Tensor] or ImageList): images to be processed
@@ -62,12 +46,8 @@ class GeneralizedRCNN(nn.Module):
         if self.training and targets is None:
             raise ValueError("In training mode, targets should be passed")
         images = to_image_list(images)
-        images_tensor = Variable(images.tensors, requires_grad=True)
-        # print(images_tensor)
-        features = self.backbone(images_tensor)
-        # print(features)
-        proposals, proposal_losses = self.rpn(images, features, targets, offset_idx)
-        # print(proposal_losses)
+        features = self.backbone(images.tensors)
+        proposals, proposal_losses = self.rpn(images, features, targets)
         if self.roi_heads:
             x, result, detector_losses = self.roi_heads(features, proposals, targets)
         else:
@@ -76,10 +56,10 @@ class GeneralizedRCNN(nn.Module):
             result = proposals
             detector_losses = {}
 
-        # if self.training:
-        losses = {}
-        losses.update(detector_losses)
-        losses.update(proposal_losses)
-        return losses
+        if self.training:
+            losses = {}
+            losses.update(detector_losses)
+            losses.update(proposal_losses)
+            return losses
 
         return result

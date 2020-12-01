@@ -8,7 +8,7 @@ from .inference import make_fcos_postprocessor
 from .loss import make_fcos_loss_evaluator
 
 from maskrcnn_benchmark.layers import Scale
-from .bbox_module import make_bbox_tower, make_layer, make_final_layers, make_cls_tower
+from .bbox_module import make_bbox_tower, make_layer, make_final_layers
 
 class FCOSHead(torch.nn.Module):
     def __init__(self, cfg, in_channels):
@@ -20,70 +20,30 @@ class FCOSHead(torch.nn.Module):
         # TODO: Implement the sigmoid version first.
         num_classes = cfg.MODEL.FCOS.NUM_CLASSES - 1
         num_level = len(cfg.MODEL.FCOS.FPN_STRIDES)
-        self.cfg = cfg
-        self.in_channels = in_channels
-        self.bbox_in_channels = in_channels
-        self.branch_channel_transit = False
 
-        if cfg.MODEL.FCOS.CLS_TOWER.APPLY:
-            cls_tower = make_cls_tower(cfg.MODEL.FCOS, in_channels)
-        else:
-            cls_tower = []
-            for i in range(cfg.MODEL.FCOS.NUM_CONVS):
-                cls_tower.append(
-                    nn.Conv2d(
-                        in_channels,
-                        in_channels,
-                        kernel_size=3,
-                        stride=1,
-                        padding=1
-                    )
-                )
-                cls_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS, in_channels))
-                cls_tower.append(nn.ReLU())
-
-        if cfg.MODEL.FCOS.MULTI_BRANCH_REG:
-            self.bbox_channels_perbranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
-            if self.bbox_channels_perbranch * cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != in_channels:
-                if self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 0:
-                    self.transition_layer = nn.Sequential(
-                        nn.Conv2d(in_channels, self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES,
-                                    1, 1, 0, bias=False),
-                        nn.GroupNorm(self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES//8, self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES),
-                        #GroupBN: GroupBN always used in Det
-                        nn.ReLU())
-                    self.bbox_in_channels = self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-                elif self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 2:
-                    self.share_transition_layer = nn.Sequential(
-                        nn.Conv2d(in_channels//cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES, self.bbox_channels_perbranch,
-                                    1, 1, 0, bias=False),
-                        nn.GroupNorm(self.bbox_channels_perbranch//8, self.bbox_channels_perbranch),
-                        #GroupBN: GroupBN always used in Det
-                        nn.ReLU())
-                    self.bbox_in_channels = self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-            bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER, self.bbox_in_channels//cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES)     
-            self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
-        else:
-            bbox_tower = []
-            for i in range(cfg.MODEL.FCOS.NUM_CONVS):
-                bbox_tower.append(
+        cls_tower = []
+        for i in range(cfg.MODEL.FCOS.NUM_CONVS):
+            cls_tower.append(
                 nn.Conv2d(
                     in_channels,
                     in_channels,
                     kernel_size=3,
                     stride=1,
                     padding=1
-                    )
                 )
-                bbox_tower.append(nn.GroupNorm(cfg.MODEL.GROUP_NORM.NUM_GROUPS, in_channels))
-                bbox_tower.append(nn.ReLU())
-            self.bbox_pred = nn.Conv2d(
-                in_channels, 4, kernel_size=3, stride=1,
-                padding=1
             )
-    
+            cls_tower.append(nn.GroupNorm(32, in_channels))
+            cls_tower.append(nn.ReLU())
+
         self.add_module('cls_tower', nn.Sequential(*cls_tower))
+        
+       
+        self.bbox_channels_perbranch = cfg.MODEL.FCOS.BBOX_TOWER.NUM_CHANNELS_PERBRANCH
+        bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER)
         self.add_module('bbox_tower', nn.Sequential(*bbox_tower))
+
+        self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
+
         self.cls_logits = nn.Conv2d(
             in_channels, num_classes, kernel_size=3, stride=1,
             padding=1
@@ -115,8 +75,6 @@ class FCOSHead(torch.nn.Module):
         logits = []
         bbox_reg = []
         centerness = []
-        if len(x) == 1:
-            x = [x[0].unsqueeze(0)]
         for l, feature in enumerate(x):
             cls_tower = self.cls_tower(feature)
             logits.append(self.cls_logits(cls_tower))
@@ -134,53 +92,30 @@ class FCOSHead(torch.nn.Module):
 
             # bbox_pred_candidates = torch.tensor(bbox_pred_candidates.detach().cpu().numpy()).cuda()
 
-            if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
-                if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.in_channels:
-                    if self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 0:
-                        feature = self.transition_layer(feature)
-                        # bbox_in_channels = self.bbox_in_channels * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-                    elif self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 2:
-                        feature_list = []
-                        split_channels = self.in_channels // self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-                        for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
-                            feature_i = self.share_transition_layer(feature[:,i*split_channels:\
-                                (i+1)*split_channels])
-                            feature_list.append(feature_i)
-                        feature = torch.cat(feature_list, dim=1) 
-                bbox_pred_candidates_list = []
-                split_channels = self.bbox_in_channels // self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-                for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
-                    bbox_pred_candidates_list.append(self.bbox_pred[i](\
-                        self.bbox_tower[i](\
-                            feature[:,i*split_channels:\
-                                (i+1)*split_channels])))
-                assert len(bbox_pred_candidates_list) == self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES, 'bbox_pred_candidates_list length error'
-                temp_list = []
-                print('offset idx = {}'.format(offset_idx))
-                for idx in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
-                    if idx == offset_idx:
-                        temp_list.append(w_grad_identity(bbox_pred_candidates_list[idx]))
-                    else:
-                        temp_list.append(wo_grad_identity(bbox_pred_candidates_list[idx]))
-                bbox_pred_candidates = torch.cat(temp_list, dim=1)
-                bbox_reg.append(torch.exp(self.scales[l](bbox_pred_candidates)))
-            else:
-                bbox_pred_candidates = self.bbox_pred(self.bbox_tower(feature))
-                bbox_pred_candidates_list = torch.split(bbox_pred_candidates, 1, 1)
-                assert len(bbox_pred_candidates_list) == 4, 'bbox_pred_candidates_list length error'
-                temp_list = []
-                print('offset idx = {}'.format(offset_idx))
-                for idx in range(4):
-                    if idx == offset_idx:
-                        temp_list.append(w_grad_identity(bbox_pred_candidates_list[idx]))
-                    else:
-                        temp_list.append(wo_grad_identity(bbox_pred_candidates_list[idx]))
-                bbox_pred_candidates = torch.cat(temp_list, dim=1)
-                bbox_reg.append(torch.exp(self.scales[l](
-                    bbox_pred_candidates
-                    )))
+            bbox_pred_candidates_list = []
+            for i in range(4):
+                bbox_pred_candidates_list.append(self.bbox_pred[i](\
+                    self.bbox_tower[i](\
+                        feature[:,i*self.bbox_channels_perbranch:\
+                            (i+1)*self.bbox_channels_perbranch])))
+            
+            # bbox_pred_candidates_list = torch.split(bbox_pred_candidates, 1, 1)
+            assert len(bbox_pred_candidates_list) == 4, 'bbox_pred_candidates_list length error'
+            
+            temp_list = []
+            print('offset idx = {}'.format(offset_idx))
+            for idx in range(4):
+                if idx == offset_idx:
+                    temp_list.append(w_grad_identity(bbox_pred_candidates_list[idx]))
+                else:
+                    temp_list.append(wo_grad_identity(bbox_pred_candidates_list[idx]))
+            bbox_pred_candidates = torch.cat(temp_list, dim=1)
+
 
             centerness.append(self.centerness(cls_tower))
+            bbox_reg.append(torch.exp(self.scales[l](
+                bbox_pred_candidates
+            )))
         return logits, bbox_reg, centerness
 
 

@@ -32,6 +32,7 @@ philly_training/
 local_training/
 loacal_training/
 aml_training/
+visual_output/
 
 # maskrcnn_benchmark/
 
