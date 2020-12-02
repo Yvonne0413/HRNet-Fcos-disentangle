@@ -13,8 +13,8 @@ MODEL:
       NUM_BLOCKS: 4
       DILATION_RATE: 1
 DATASETS:
-  TRAIN: ("coco_2017_val",)
-  TEST: ("coco_2017_val",)
+  TRAIN: ("coco_2014_train", "coco_2014_valminusminival")
+  TEST: ("coco_2014_minival",)
 INPUT:
   MIN_SIZE_TRAIN: (800,)
   MAX_SIZE_TRAIN: 1333

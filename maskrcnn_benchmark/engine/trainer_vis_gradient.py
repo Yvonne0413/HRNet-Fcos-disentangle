@@ -130,7 +130,7 @@ def do_train(
 
         grad_map_save = torch.cat(grad_map_save, dim=1)
         # vis_v3 change to another names
-        save_path = 'visual_output/vis_test'
+        save_path = 'visual_output/fcos_hrnet_w18_5l_2x_nosb_new_20201123_014551'
         if not os.path.exists(save_path):
             os.makedirs(save_path)
             

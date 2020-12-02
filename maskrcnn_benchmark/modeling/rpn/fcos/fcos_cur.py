@@ -102,7 +102,7 @@ class FCOSHead(torch.nn.Module):
         )
 
         # initialization
-        for modules in [self.cls_tower, self.bbox_tower,
+        for modules in [self.cls_tower,
                         self.cls_logits, self.bbox_pred,
                         self.centerness]:
             for l in modules.modules():
@@ -111,56 +111,56 @@ class FCOSHead(torch.nn.Module):
                     if l.bias is not None:
                         torch.nn.init.constant_(l.bias, 0)
         
-        # for modules in [self.bbox_tower]:
-        #     for l in modules.modules():
-        #         if isinstance(l, nn.Conv2d):
-        #             torch.nn.init.normal_(l.weight, std=0.001)
-        #             for name, _ in l.named_parameters():
-        #                 if name in ['bias']:
-        #                     torch.nn.init.constant_(l.bias, 0)
-        #         elif isinstance(l, nn.BatchNorm2d):
-        #             torch.nn.init.constant_(l.weight, 1)
-        #             torch.nn.init.constant_(l.bias, 0)
-        #         elif isinstance(l, nn.ConvTranspose2d):
-        #             torch.nn.init.normal_(l.weight, std=0.001)
-        #             for name, _ in l.named_parameters():
-        #                 if name in ['bias']:
-        #                     torch.nn.init.constant_(l.bias, 0)
+        for modules in [self.bbox_tower]:
+            for l in modules.modules():
+                if isinstance(l, nn.Conv2d):
+                    torch.nn.init.normal_(l.weight, std=0.001)
+                    for name, _ in l.named_parameters():
+                        if name in ['bias']:
+                            torch.nn.init.constant_(l.bias, 0)
+                elif isinstance(l, nn.BatchNorm2d):
+                    torch.nn.init.constant_(l.weight, 1)
+                    torch.nn.init.constant_(l.bias, 0)
+                elif isinstance(l, nn.ConvTranspose2d):
+                    torch.nn.init.normal_(l.weight, std=0.001)
+                    for name, _ in l.named_parameters():
+                        if name in ['bias']:
+                            torch.nn.init.constant_(l.bias, 0)
         
-        #     for l in self.modules():
-        #         if hasattr(l, 'conv_bboxtower_def'):
-        #             torch.nn.init.constant_(l.conv_bboxtower_def.weight, 0)
-        #             if hasattr(l, 'bias'):
-        #                 torch.nn.init.constant_(l.conv_offset.bias, 0)
-        #         if hasattr(l, 'conv1_bboxtower_def'):
-        #             torch.nn.init.constant_(l.conv1_bboxtower_def.weight, 0)
-        #             if hasattr(l, 'bias'):
-        #                 torch.nn.init.constant_(l.conv_offset_1.bias, 0)
-        #         if hasattr(l, 'conv2_bboxtower_def'):
-        #             torch.nn.init.constant_(l.conv2_bboxtower_def.weight, 0)
-        #             if hasattr(l, 'bias'):
-        #                 torch.nn.init.constant_(l.conv_offset_2.bias, 0)
+            for l in self.modules():
+                if hasattr(l, 'conv_bboxtower_def'):
+                    torch.nn.init.constant_(l.conv_bboxtower_def.weight, 0)
+                    if hasattr(l, 'bias'):
+                        torch.nn.init.constant_(l.conv_offset.bias, 0)
+                if hasattr(l, 'conv1_bboxtower_def'):
+                    torch.nn.init.constant_(l.conv1_bboxtower_def.weight, 0)
+                    if hasattr(l, 'bias'):
+                        torch.nn.init.constant_(l.conv_offset_1.bias, 0)
+                if hasattr(l, 'conv2_bboxtower_def'):
+                    torch.nn.init.constant_(l.conv2_bboxtower_def.weight, 0)
+                    if hasattr(l, 'bias'):
+                        torch.nn.init.constant_(l.conv_offset_2.bias, 0)
 
-        #         if hasattr(l, 'conv_transform_matrix_transstn'):
-        #             torch.nn.init.constant_(l.conv_transform_matrix_transstn.weight, 0)
-        #         if hasattr(l, 'conv1_transform_matrix_transstn'):
-        #             torch.nn.init.constant_(l.conv1_transform_matrix_transstn.weight, 0)
-        #         if hasattr(l, 'conv2_transform_matrix_transstn'):
-        #             torch.nn.init.constant_(l.conv2_transform_matrix_transstn.weight, 0)
+                if hasattr(l, 'conv_transform_matrix_transstn'):
+                    torch.nn.init.constant_(l.conv_transform_matrix_transstn.weight, 0)
+                if hasattr(l, 'conv1_transform_matrix_transstn'):
+                    torch.nn.init.constant_(l.conv1_transform_matrix_transstn.weight, 0)
+                if hasattr(l, 'conv2_transform_matrix_transstn'):
+                    torch.nn.init.constant_(l.conv2_transform_matrix_transstn.weight, 0)
 
 
-        #         if hasattr(l, 'conv_translation_transstn'):
-        #             torch.nn.init.constant_(l.conv_translation_transstn.weight, 0)
-        #             if hasattr(l, 'bias'):
-        #                 torch.nn.init.constant_(l.conv_translation_transstn.bias, 0)   
-        #         if hasattr(l, 'conv1_translation_transstn'):
-        #             torch.nn.init.constant_(l.conv1_translation_transstn.weight, 0)
-        #             if hasattr(l, 'bias'):
-        #                 torch.nn.init.constant_(l.conv1_translation_transstn.bias, 0)
-        #         if hasattr(l, 'conv2_translation_transstn'):
-        #             torch.nn.init.constant_(l.conv2_translation_transstn.weight, 0)
-        #             if hasattr(l, 'bias'):
-        #                 torch.nn.init.constant_(l.conv2_translation_transstn.bias, 0)
+                if hasattr(l, 'conv_translation_transstn'):
+                    torch.nn.init.constant_(l.conv_translation_transstn.weight, 0)
+                    if hasattr(l, 'bias'):
+                        torch.nn.init.constant_(l.conv_translation_transstn.bias, 0)   
+                if hasattr(l, 'conv1_translation_transstn'):
+                    torch.nn.init.constant_(l.conv1_translation_transstn.weight, 0)
+                    if hasattr(l, 'bias'):
+                        torch.nn.init.constant_(l.conv1_translation_transstn.bias, 0)
+                if hasattr(l, 'conv2_translation_transstn'):
+                    torch.nn.init.constant_(l.conv2_translation_transstn.weight, 0)
+                    if hasattr(l, 'bias'):
+                        torch.nn.init.constant_(l.conv2_translation_transstn.bias, 0)
 
         # initialize the bias for focal loss
         prior_prob = cfg.MODEL.FCOS.PRIOR_PROB

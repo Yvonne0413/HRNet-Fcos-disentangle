@@ -257,7 +257,7 @@ class TRANSSTNBLOCK(nn.Module):
         self.relu_bboxtower_transstn = nn.ReLU()
  
     def forward(self, x):
-        residual = x
+        # residual = x
         (N,C,H,W) = x.shape
         transform_matrix = self.conv_transform_matrix_transstn(x)
         translation = self.conv_translation_transstn(x)
@@ -270,7 +270,7 @@ class TRANSSTNBLOCK(nn.Module):
         offset[:,1::2,:,:] += translation[:,1:2,:,:]
         out = self.conv_transstn(x, offset)
         out = self.gn_bboxtower_transstn(out)
-        out += residual
+        # out += residual
         out = self.relu_bboxtower_transstn(out)
         return out
 
