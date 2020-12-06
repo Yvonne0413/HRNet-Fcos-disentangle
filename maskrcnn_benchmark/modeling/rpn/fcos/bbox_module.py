@@ -274,8 +274,56 @@ class TRANSSTNBLOCK(nn.Module):
         out = self.relu_bboxtower_transstn(out)
         return out
 
+class TRANSSTNskipBLOCK(nn.Module):
+    # Different from Pose basicblock: 
+    # 1. GroupNorm for det - BatchNorm for pose
+    # 2. Has skip conn for det - skip conn for pose
+    expansion = 1
 
-class TransstnSkipBlock(nn.Module):
+    def __init__(self, group_num, inplanes, outplanes, stride=1, 
+            downsample=None, dilation=1, deformable_groups=1):
+        super(TRANSSTNskipBLOCK, self).__init__()
+        regular_matrix = torch.tensor(np.array([[-1, -1, -1, 0, 0, 0, 1, 1, 1], \
+                                                [-1, 0, 1, -1 ,0 ,1 ,-1, 0, 1]]))
+        self.register_buffer('regular_matrix', regular_matrix.float())
+        self.downsample = downsample
+        self.conv_transform_matrix_transstn = nn.Conv2d(inplanes, 4, 3, 1, 1, bias=True)
+        self.conv_translation_transstn = nn.Conv2d(inplanes, 2, 3, 1, 1, bias=True)
+        self.conv_transstn = DeformConv(
+            inplanes,
+            outplanes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation,
+            dilation=dilation,
+            deformable_groups=deformable_groups)
+        self.gn_bboxtower_transstn = nn.GroupNorm(group_num, outplanes)
+        self.relu_bboxtower_transstn = nn.ReLU()
+ 
+    def forward(self, x):
+        residual = x
+        (N,C,H,W) = x.shape
+        transform_matrix = self.conv_transform_matrix_transstn(x)
+        translation = self.conv_translation_transstn(x)
+        transform_matrix = transform_matrix.permute(0,2,3,1).reshape((N*H*W,2,2))
+        offset = torch.matmul(transform_matrix, self.regular_matrix)
+        offset = offset-self.regular_matrix
+        offset = offset.transpose(1,2)
+        offset = offset.reshape((N,H,W,18)).permute(0,3,1,2)
+        offset[:,0::2,:,:] += translation[:,0:1,:,:]
+        offset[:,1::2,:,:] += translation[:,1:2,:,:]
+        out = self.conv_transstn(x, offset)
+        out = self.gn_bboxtower_transstn(out)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+            
+        out += residual
+        out = self.relu_bboxtower_transstn(out)
+
+        return out
+
+class TRANSSTNskipBlock2(nn.Module):
     # Different from Pose basicblock: 
     # 1. GroupNorm for det - BatchNorm for pose
     # 2. No skip conn for det - skip conn for pose
@@ -283,7 +331,7 @@ class TransstnSkipBlock(nn.Module):
     
     def __init__(self, group_num, inplanes, outplanes, stride=1, 
             downsample=None, dilation=1, deformable_groups=1):
-        super(TransstnSkipBlock, self).__init__()
+        super(TRANSSTNskipBlock2, self).__init__()
         regular_matrix = torch.tensor(np.array([[-1, -1, -1, 0, 0, 0, 1, 1, 1], \
                                                 [-1, 0, 1, -1 ,0 ,1 ,-1, 0, 1]]))
         self.register_buffer('regular_matrix', regular_matrix.float())
@@ -443,7 +491,7 @@ blocks_dict = {
     'TRANSSTNBLOCK': TRANSSTNBLOCK,
     'DEFORMABLE': DeformableBlock,
     'DEFSKIP': DeformableSkipBlock,
-    'TRANSSKIP': TransstnSkipBlock
+    'TRANSSKIP': TRANSSTNskipBLOCK
 }
 
 def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
@@ -477,12 +525,12 @@ def make_cls_layer(block, pos_tuple, group_num, inplanes, planes, blocks, dilati
 
 def make_layer(in_channels, option, block, pos_tuple, group_num, inplanes, planes, blocks, dilation=1, stride=1):
     downsample = None
-    if stride != 1 or inplanes != planes * block.expansion:
+    if stride != 1 or in_channels != planes * block.expansion:
         # what is block.expansion? the component set in block class.
         downsample = nn.Sequential(
-            nn.Conv2d(inplanes, planes * block.expansion,
+            nn.Conv2d(in_channels, planes * block.expansion,
                         kernel_size=1, stride=stride, bias=False),
-            nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
+            nn.GroupNorm(planes * block.expansion//8, planes * block.expansion),
         )
 
     layers = []
@@ -496,7 +544,7 @@ def make_layer(in_channels, option, block, pos_tuple, group_num, inplanes, plane
                 nn.ReLU())
             layers.append(transition_layer)
         elif option == 3:
-            inplanes = in_channels
+            inplanes = in_channels # inplanes changed from channel per branch 128 to fpn out channel 64
     
 
     if 0 in pos_tuple:

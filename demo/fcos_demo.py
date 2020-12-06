@@ -18,7 +18,7 @@ def main():
     )
     parser.add_argument(
         "--weights",
-        default="FCOS_R_50_FPN_1x.pth",
+        default="FCOS_imprv_R_50_FPN_1x.pth",
         metavar="FILE",
         help="path to the trained model",
     )
@@ -98,9 +98,16 @@ def main():
         if img is None:
             continue
         start_time = time.time()
+        print("cv2 imread image", type(img), img.shape)
         composite = coco_demo.run_on_opencv_image(img)
         print("{}\tinference time: {:.2f}s".format(im_name, time.time() - start_time))
-        cv2.imshow(im_name, composite)
+        # cv2.imshow(im_name, composite)
+        output_dir = "visual_output/"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_path = output_dir + "zhuoyi_" + im_name
+        print("saving image into", output_path)
+        cv2.imwrite(output_path, composite)
     print("Press any keys to exit ...")
     cv2.waitKey()
     cv2.destroyAllWindows()

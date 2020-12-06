@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.autograd import Variable
 
 from .inference import make_fcos_postprocessor
 from .loss import make_fcos_loss_evaluator
@@ -60,14 +61,6 @@ class FCOSHead(torch.nn.Module):
                         #GroupBN: GroupBN always used in Det
                         nn.ReLU())
                     self.bbox_in_channels = self.bbox_channels_perbranch*cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
-                # elif self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 1:
-                #     self.transition_layer = nn.Sequential(
-                #         nn.Conv2d(in_channels//cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES, self.bbox_channels_perbranch,
-                #                     1, 1, 0, bias=False),
-                #         nn.GroupNorm(self.bbox_channels_perbranch//8, self.bbox_channels_perbranch),
-                #         #GroupBN: GroupBN always used in Det
-                #         nn.ReLU())
-
             bbox_tower = make_bbox_tower(cfg.MODEL.FCOS.BBOX_TOWER, self.bbox_in_channels//cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES)     
             self.bbox_pred = make_final_layers(cfg.MODEL.FCOS.BBOX_TOWER)
         else:
@@ -88,21 +81,21 @@ class FCOSHead(torch.nn.Module):
                 in_channels, 4, kernel_size=3, stride=1,
                 padding=1
             )
-        
+    
         self.add_module('cls_tower', nn.Sequential(*cls_tower))
         self.add_module('bbox_tower', nn.Sequential(*bbox_tower))
         self.cls_logits = nn.Conv2d(
             in_channels, num_classes, kernel_size=3, stride=1,
             padding=1
         )
-        
+       
         self.centerness = nn.Conv2d(
             in_channels, 1, kernel_size=3, stride=1,
             padding=1
         )
 
         # initialization
-        for modules in [self.cls_tower,
+        for modules in [self.cls_tower, self.bbox_tower,
                         self.cls_logits, self.bbox_pred,
                         self.centerness]:
             for l in modules.modules():
@@ -110,57 +103,6 @@ class FCOSHead(torch.nn.Module):
                     torch.nn.init.normal_(l.weight, std=0.01)
                     if l.bias is not None:
                         torch.nn.init.constant_(l.bias, 0)
-        
-        for modules in [self.bbox_tower]:
-            for l in modules.modules():
-                if isinstance(l, nn.Conv2d):
-                    torch.nn.init.normal_(l.weight, std=0.001)
-                    for name, _ in l.named_parameters():
-                        if name in ['bias']:
-                            torch.nn.init.constant_(l.bias, 0)
-                elif isinstance(l, nn.BatchNorm2d):
-                    torch.nn.init.constant_(l.weight, 1)
-                    torch.nn.init.constant_(l.bias, 0)
-                elif isinstance(l, nn.ConvTranspose2d):
-                    torch.nn.init.normal_(l.weight, std=0.001)
-                    for name, _ in l.named_parameters():
-                        if name in ['bias']:
-                            torch.nn.init.constant_(l.bias, 0)
-        
-            for l in self.modules():
-                if hasattr(l, 'conv_bboxtower_def'):
-                    torch.nn.init.constant_(l.conv_bboxtower_def.weight, 0)
-                    if hasattr(l, 'bias'):
-                        torch.nn.init.constant_(l.conv_offset.bias, 0)
-                if hasattr(l, 'conv1_bboxtower_def'):
-                    torch.nn.init.constant_(l.conv1_bboxtower_def.weight, 0)
-                    if hasattr(l, 'bias'):
-                        torch.nn.init.constant_(l.conv_offset_1.bias, 0)
-                if hasattr(l, 'conv2_bboxtower_def'):
-                    torch.nn.init.constant_(l.conv2_bboxtower_def.weight, 0)
-                    if hasattr(l, 'bias'):
-                        torch.nn.init.constant_(l.conv_offset_2.bias, 0)
-
-                if hasattr(l, 'conv_transform_matrix_transstn'):
-                    torch.nn.init.constant_(l.conv_transform_matrix_transstn.weight, 0)
-                if hasattr(l, 'conv1_transform_matrix_transstn'):
-                    torch.nn.init.constant_(l.conv1_transform_matrix_transstn.weight, 0)
-                if hasattr(l, 'conv2_transform_matrix_transstn'):
-                    torch.nn.init.constant_(l.conv2_transform_matrix_transstn.weight, 0)
-
-
-                if hasattr(l, 'conv_translation_transstn'):
-                    torch.nn.init.constant_(l.conv_translation_transstn.weight, 0)
-                    if hasattr(l, 'bias'):
-                        torch.nn.init.constant_(l.conv_translation_transstn.bias, 0)   
-                if hasattr(l, 'conv1_translation_transstn'):
-                    torch.nn.init.constant_(l.conv1_translation_transstn.weight, 0)
-                    if hasattr(l, 'bias'):
-                        torch.nn.init.constant_(l.conv1_translation_transstn.bias, 0)
-                if hasattr(l, 'conv2_translation_transstn'):
-                    torch.nn.init.constant_(l.conv2_translation_transstn.weight, 0)
-                    if hasattr(l, 'bias'):
-                        torch.nn.init.constant_(l.conv2_translation_transstn.bias, 0)
 
         # initialize the bias for focal loss
         prior_prob = cfg.MODEL.FCOS.PRIOR_PROB
@@ -169,17 +111,13 @@ class FCOSHead(torch.nn.Module):
 
         self.scales = nn.ModuleList([Scale(init_value=1.0) for _ in range(num_level)])
 
-    def forward(self, x):
+    def forward(self, x, offset_idx):
         logits = []
         bbox_reg = []
         centerness = []
-        # print("input x", len(x), x)
-        # add the following two lines for w/o fpn
         if len(x) == 1:
             x = [x[0].unsqueeze(0)]
-
         for l, feature in enumerate(x):
-            # print("l and feature", l, feature.size(), type(feature))
             cls_tower = self.cls_tower(feature)
             logits.append(self.cls_logits(cls_tower))
 
@@ -188,9 +126,14 @@ class FCOSHead(torch.nn.Module):
             # bbox_tower = self.bbox_tower(feature)
             # bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
             # centerness.append(self.centerness(bbox_tower))
-                    
-            # bbox_feature = self.transition_layer(feature)            
+
+            # bbox_pred_candidates = self.bbox_pred(self.bbox_tower(feature))
+            # bbox_pred_candidates_new = wo_grad_identity(bbox_pred_candidates)
             
+            # bbox_pred_candidates = bbox_pred_candidates * 0 + torch.ones(bbox_pred_candidates.shape, dtype=torch.float).cuda()
+
+            # bbox_pred_candidates = torch.tensor(bbox_pred_candidates.detach().cpu().numpy()).cuda()
+
             if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
                 if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.in_channels:
                     if self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 0:
@@ -204,45 +147,40 @@ class FCOSHead(torch.nn.Module):
                                 (i+1)*split_channels])
                             feature_list.append(feature_i)
                         feature = torch.cat(feature_list, dim=1) 
-                bbox = []
+                bbox_pred_candidates_list = []
                 split_channels = self.bbox_in_channels // self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES
                 for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
-                    bbox.append(self.bbox_pred[i](\
+                    bbox_pred_candidates_list.append(self.bbox_pred[i](\
                         self.bbox_tower[i](\
                             feature[:,i*split_channels:\
                                 (i+1)*split_channels])))
-                bbox = torch.cat(bbox, dim=1)
-                bbox_reg.append(torch.exp(self.scales[l](bbox)))
+                assert len(bbox_pred_candidates_list) == self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES, 'bbox_pred_candidates_list length error'
+                temp_list = []
+                print('offset idx = {}'.format(offset_idx))
+                for idx in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
+                    if idx == offset_idx:
+                        temp_list.append(w_grad_identity(bbox_pred_candidates_list[idx]))
+                    else:
+                        temp_list.append(wo_grad_identity(bbox_pred_candidates_list[idx]))
+                bbox_pred_candidates = torch.cat(temp_list, dim=1)
+                bbox_reg.append(torch.exp(self.scales[l](bbox_pred_candidates)))
             else:
-                bbox_tower = self.bbox_tower(feature)
-                bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
+                bbox_pred_candidates = self.bbox_pred(self.bbox_tower(feature))
+                bbox_pred_candidates_list = torch.split(bbox_pred_candidates, 1, 1)
+                assert len(bbox_pred_candidates_list) == 4, 'bbox_pred_candidates_list length error'
+                temp_list = []
+                print('offset idx = {}'.format(offset_idx))
+                for idx in range(4):
+                    if idx == offset_idx:
+                        temp_list.append(w_grad_identity(bbox_pred_candidates_list[idx]))
+                    else:
+                        temp_list.append(wo_grad_identity(bbox_pred_candidates_list[idx]))
+                bbox_pred_candidates = torch.cat(temp_list, dim=1)
+                bbox_reg.append(torch.exp(self.scales[l](
+                    bbox_pred_candidates
+                    )))
 
             centerness.append(self.centerness(cls_tower))
-        # else:
-        #     l = 0
-        #     feature = x[l].unsqueeze(0)
-        #     cls_tower = self.cls_tower(feature)
-        #     logits.append(self.cls_logits(cls_tower))
-        #     if self.cfg.MODEL.FCOS.MULTI_BRANCH_REG:
-        #         if self.bbox_channels_perbranch * self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES != self.cfg.MODEL.HRNET.FPN.OUT_CHANNEL:
-        #             if self.cfg.MODEL.FCOS.BBOX_TOWER.CHANNEL_OPTION == 0:
-        #                 feature = self.transition_layer(feature)
-        #             else:
-
-        #         bbox = []
-        #         for i in range(self.cfg.MODEL.FCOS.BBOX_TOWER.NUM_BRANCHES):
-        #             bbox.append(self.bbox_pred[i](\
-        #                 self.bbox_tower[i](\
-        #                     feature[:,i*self.bbox_channels_perbranch:\
-        #                         (i+1)*self.bbox_channels_perbranch])))
-        #         bbox = torch.cat(bbox, dim=1)
-        #         bbox_reg.append(torch.exp(self.scales[l](bbox)))
-        #     else:
-        #         bbox_tower = self.bbox_tower(feature)
-        #         bbox_reg.append(torch.exp(self.scales[l](self.bbox_pred(bbox_tower))))
-
-        #     centerness.append(self.centerness(cls_tower))
-
         return logits, bbox_reg, centerness
 
 
@@ -264,14 +202,14 @@ class FCOSModule(torch.nn.Module):
         self.loss_evaluator = loss_evaluator
         self.fpn_strides = cfg.MODEL.FCOS.FPN_STRIDES
 
-    def forward(self, images, features, targets=None):
+    def forward(self, images, features, targets=None, offset_idx=None):
         """
         Arguments:
             images (ImageList): images for which we want to compute the predictions
             features (list[Tensor]): features computed from the images that are
                 used for computing the predictions. Each tensor in the list
                 correspond to different feature levels
-            targets (list[BoxList): ground-truth boxes present in the image (optional if for inference)
+            targets (list[BoxList): ground-truth boxes present in the image (optional)
 
         Returns:
             boxes (list[BoxList]): the predicted boxes from the RPN, one BoxList per
@@ -279,10 +217,10 @@ class FCOSModule(torch.nn.Module):
             losses (dict[Tensor]): the losses for the model during training. During
                 testing, it is an empty dict.
         """
-        box_cls, box_regression, centerness = self.head(features)
+        box_cls, box_regression, centerness = self.head(features, offset_idx)
         locations = self.compute_locations(features)
- 
-        if self.training:
+        # origin: if self.training
+        if 1:
             return self._forward_train(
                 locations, box_cls, 
                 box_regression, 
@@ -340,3 +278,27 @@ class FCOSModule(torch.nn.Module):
 
 def build_fcos(cfg, in_channels):
     return FCOSModule(cfg, in_channels)
+
+@torch.no_grad()
+def wo_grad_identity(tensor):
+    output_tensor = torch.tensor(tensor.detach().cpu().numpy()).cuda()
+    return output_tensor
+
+def w_grad_identity(tensor):
+    output_tensor = tensor
+    return output_tensor
+
+# utils
+@torch.no_grad()
+def concat_all_gather(tensor):
+    """
+    Performs all_gather operation on the provided tensors.
+    *** Warning ***: torch.distributed.all_gather has no gradient.
+    """
+    tensor = tensor.detach()
+    tensors_gather = [torch.ones_like(tensor)
+        for _ in range(torch.distributed.get_world_size())]
+    torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
+
+    output = torch.cat(tensors_gather, dim=0)
+    return output
