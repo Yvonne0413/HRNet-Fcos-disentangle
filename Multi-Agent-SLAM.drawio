@@ -1,1 +1,55 @@
-<mxfile host="app.diagrams.net" modified="2021-06-07T07:13:02.229Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36" version="14.7.5" etag="RA0JQFuokZNq6f5u6WLQ" type="github"><diagram id="m4NejL1UYLv5yy4pqeT0">UzV2zq1wL0osyPDNT0nNUTV2VTV2LsrPL4GwciucU3NyVI0MMlNUjV1UjYwMgFjVyA2HrCFY1qAgsSg1rwSLBiADYTaQg2Y1AA==</diagram></mxfile>
+<mxfile host="app.diagrams.net" modified="2021-06-08T08:17:24.991Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36" etag="viWTLlwDilMv0u2MAARA" version="14.7.6" type="github">
+  <diagram id="m4NejL1UYLv5yy4pqeT0" name="Page-1">
+    <mxGraphModel dx="856" dy="580" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-1" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="160" y="120" width="100" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-2" value="Camera 1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="100" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-4" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="340" y="120" width="100" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="XH7NkgblV-3CcpiBkp1a-5" target="XH7NkgblV-3CcpiBkp1a-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-5" value="Frames" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="175" y="130" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="XH7NkgblV-3CcpiBkp1a-6" target="XH7NkgblV-3CcpiBkp1a-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-6" value="ROI masks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="175" y="180" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-8" value="Video Compressor" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="175" y="230" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="XH7NkgblV-3CcpiBkp1a-11" target="XH7NkgblV-3CcpiBkp1a-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-11" value="Frames" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="355" y="130" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="XH7NkgblV-3CcpiBkp1a-13" target="XH7NkgblV-3CcpiBkp1a-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-13" value="ROI masks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="355" y="180" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-14" value="Video Compressor" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="355" y="230" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-15" value="Camera n" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="100" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-16" value="&lt;font style=&quot;font-size: 18px&quot;&gt;&lt;b&gt;......&lt;/b&gt;&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="280" y="185" width="40" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
