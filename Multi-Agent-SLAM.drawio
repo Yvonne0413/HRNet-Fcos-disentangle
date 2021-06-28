@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" modified="2021-06-18T05:37:18.624Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36" etag="bVGOTwn0Zk2zzKAQlQZj" version="14.7.7" type="github">
+<mxfile host="app.diagrams.net" modified="2021-06-28T07:33:53.860Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36" etag="0DElAox-IP9ULHb9oAlL" version="14.8.0" type="github">
   <diagram id="m4NejL1UYLv5yy4pqeT0" name="Page-1">
-    <mxGraphModel dx="856" dy="523" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="362" dy="479" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -8,7 +8,7 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="XH7NkgblV-3CcpiBkp1a-19" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;gradientColor=none;dashed=1;" parent="1" vertex="1">
-          <mxGeometry x="50" y="310" width="520" height="260" as="geometry" />
+          <mxGeometry x="50" y="310" width="520" height="230" as="geometry" />
         </mxCell>
         <mxCell id="XH7NkgblV-3CcpiBkp1a-1" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;" parent="1" vertex="1">
           <mxGeometry x="160" y="120" width="100" height="160" as="geometry" />
@@ -71,20 +71,14 @@
         <mxCell id="XH7NkgblV-3CcpiBkp1a-16" value="&lt;font style=&quot;font-size: 18px&quot;&gt;&lt;b&gt;......&lt;/b&gt;&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
           <mxGeometry x="290" y="185" width="40" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-20" value="Adaptive Compression SLAM Server" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;dashed=1;" parent="1" vertex="1">
-          <mxGeometry x="160" y="530" width="310" height="40" as="geometry" />
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-20" value="Adaptive Compression Perception Server" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;dashed=1;" parent="1" vertex="1">
+          <mxGeometry x="160" y="490" width="310" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" source="XH7NkgblV-3CcpiBkp1a-23" target="XH7NkgblV-3CcpiBkp1a-42" edge="1">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-23" value="Perception&lt;br&gt;inference&lt;br&gt;thread 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="170" y="417.5" width="80" height="45" as="geometry" />
         </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-23" value="SLAM &lt;br&gt;thread 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
-          <mxGeometry x="170" y="415" width="80" height="35" as="geometry" />
-        </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-44" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeWidth=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" source="XH7NkgblV-3CcpiBkp1a-24" target="XH7NkgblV-3CcpiBkp1a-42" edge="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-24" value="SLAM &lt;br&gt;thread 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
-          <mxGeometry x="390" y="415" width="80" height="35" as="geometry" />
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-24" value="Perception&lt;br&gt;inference&lt;br&gt;thread 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="390" y="417.5" width="80" height="42.5" as="geometry" />
         </mxCell>
         <mxCell id="XH7NkgblV-3CcpiBkp1a-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="XH7NkgblV-3CcpiBkp1a-25" target="XH7NkgblV-3CcpiBkp1a-26" edge="1">
           <mxGeometry relative="1" as="geometry" />
@@ -130,19 +124,18 @@
         <mxCell id="XH7NkgblV-3CcpiBkp1a-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" source="XH7NkgblV-3CcpiBkp1a-29" target="XH7NkgblV-3CcpiBkp1a-24" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" source="XH7NkgblV-3CcpiBkp1a-29" target="XH7NkgblV-3CcpiBkp1a-23" edge="1">
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;dashed=1;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="XH7NkgblV-3CcpiBkp1a-29" target="XH7NkgblV-3CcpiBkp1a-23" edge="1">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="370" y="340" />
               <mxPoint x="370" y="433" />
+              <mxPoint x="283" y="433" />
             </Array>
+            <mxPoint x="250" y="438" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-29" value="Optimal Compression Configure Generator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
-          <mxGeometry x="215" y="325" width="135" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="XH7NkgblV-3CcpiBkp1a-42" value="SLAM Global thread" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
-          <mxGeometry x="270" y="490" width="105" height="40" as="geometry" />
+        <mxCell id="XH7NkgblV-3CcpiBkp1a-29" value="Optimal Compression and bandwidth Configure Generator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+          <mxGeometry x="220" y="317.5" width="135" height="45" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
